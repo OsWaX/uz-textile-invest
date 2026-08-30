@@ -9,11 +9,31 @@ import {
 } from '../ui.js';
 import { openCompanyForm, uploadZone, fileRow, openCorrectionForm } from './forms.js';
 
+/** Метка роли компании: вычисляется по фактическим связям с проектами. */
+function roleTag(role) {
+  if (role === 'both') return h('span', { class: 'tag tag-indigo' }, 'Обе роли');
+  if (role === 'local') return h('span', { class: 'tag tag-ok' }, 'Местный партнёр');
+  return h('span', { class: 'tag' }, 'Иностранный партнёр');
+}
+
 export async function renderCompanies({ query, navigate }) {
   const data = await api.companies({ ...query, limit: 50 });
 
   const searchInput = h('input', { type: 'search', value: query.search || '', placeholder: 'Название, отрасль, город, контактное лицо…' });
   searchInput.addEventListener('input', debounce(() => navigate('/companies', { ...query, search: searchInput.value, offset: 0 }), 400));
+
+  const chips = h('div', { class: 'filter-chips' },
+    h('button', {
+      class: `chip ${query.local === '1' ? 'active' : ''}`,
+      title: 'Организации со страной «Узбекистан» — потенциальные местные партнёры',
+      onclick: () => navigate('/companies', { ...query, local: query.local === '1' ? '' : '1', offset: 0 }),
+    }, 'Местные партнёры'),
+    h('button', {
+      class: `chip ${query.role === 'partner' ? 'active' : ''}`,
+      title: 'Компании, уже указанные местным партнёром хотя бы в одном проекте',
+      onclick: () => navigate('/companies', { ...query, role: query.role === 'partner' ? '' : 'partner', offset: 0 }),
+    }, 'Участвуют как местный партнёр'),
+    Object.keys(query).length ? h('button', { class: 'chip', onclick: () => navigate('/companies') }, '✕ Сбросить') : null);
 
   const filters = h('div', { class: 'filters' },
     field('Поиск', searchInput),
@@ -29,7 +49,7 @@ export async function renderCompanies({ query, navigate }) {
     ? h('div', { class: 'table-wrap' },
         h('table', { class: 'data' },
           h('thead', {}, h('tr', {},
-            h('th', {}, 'Компания'), h('th', {}, 'Страна и город'), h('th', {}, 'Отрасль'),
+            h('th', {}, 'Компания'), h('th', {}, 'Роль'), h('th', {}, 'Страна и город'), h('th', {}, 'Отрасль'),
             h('th', { class: 'num' }, 'Проектов'), h('th', { class: 'num' }, 'Сумма (USD)'),
             h('th', { class: 'num' }, 'Встреч'), h('th', {}, 'Ответственный')
           )),
@@ -39,6 +59,7 @@ export async function renderCompanies({ query, navigate }) {
                 h('a', { href: `#/companies/${company.id}`, class: 't-main' }, company.name),
                 company.website ? h('div', { class: 't-sub' }, company.website.replace(/^https?:\/\//, '')) : null
               ),
+              h('td', {}, roleTag(company.role)),
               h('td', {}, company.country_name || '—', h('div', { class: 't-sub' }, company.city || '')),
               h('td', {}, company.industry || '—'),
               h('td', { class: 'num' }, formatNumber(company.projects_count)),
@@ -67,6 +88,7 @@ export async function renderCompanies({ query, navigate }) {
         }, '+ Новая компания')
       )
     ),
+    chips,
     filters,
     h('div', { class: 'card' },
       h('div', { class: 'card-head' }, h('h2', {}, `Всего компаний: ${formatNumber(data.total)}`)),
@@ -98,9 +120,7 @@ export async function renderCompany({ params, navigate }) {
         h('div', { class: 'titles' },
           h('h1', {}, company.name),
           h('div', { class: 'subtitle' },
-            company.role === 'local' ? h('span', { class: 'tag tag-ok' }, 'Местный партнёр')
-              : company.role === 'both' ? h('span', { class: 'tag tag-indigo' }, 'Иностранный и местный партнёр')
-              : null,
+            company.role !== 'foreign' ? roleTag(company.role) : null,
             company.role !== 'foreign' ? ' · ' : '',
             `${company.country_name || '—'}${company.city ? `, ${company.city}` : ''}`,
             company.industry ? ` · ${company.industry}` : '',

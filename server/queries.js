@@ -246,7 +246,10 @@ const COMPANY_SELECT = `
          u.full_name AS responsible_name,
          (SELECT COUNT(*) FROM projects p WHERE p.company_id = c.id AND p.is_deleted = 0) AS projects_count,
          (SELECT COALESCE(SUM(p.amount), 0) FROM projects p WHERE p.company_id = c.id AND p.is_deleted = 0 AND p.currency = 'USD') AS amount_usd,
-         (SELECT COUNT(*) FROM meetings m WHERE m.company_id = c.id AND m.is_deleted = 0) AS meetings_count
+         (SELECT COUNT(*) FROM meetings m WHERE m.company_id = c.id AND m.is_deleted = 0) AS meetings_count,
+         (SELECT COUNT(*) FROM project_partners pp JOIN projects p2 ON p2.id = pp.project_id AND p2.is_deleted = 0
+            WHERE pp.company_id = c.id) AS partner_projects_count,
+         (co.iso2 = 'UZ') AS is_local
   FROM companies c
   LEFT JOIN countries co ON co.id = c.country_id
   LEFT JOIN regions r    ON r.id = co.region_id
@@ -259,6 +262,12 @@ function listCompanies(query = {}) {
   if (query.country_id) { where.push('c.country_id = ?'); params.push(Number(query.country_id)); }
   if (query.region) { where.push('r.code = ?'); params.push(query.region); }
   if (query.responsible_id) { where.push('c.responsible_user_id = ?'); params.push(Number(query.responsible_id)); }
+  // Быстрый отбор узбекских организаций — потенциальных местных партнёров
+  if (query.local === '1') where.push("co.iso2 = 'UZ'");
+  if (query.role === 'partner') {
+    where.push(`EXISTS (SELECT 1 FROM project_partners pp JOIN projects p3 ON p3.id = pp.project_id
+                        AND p3.is_deleted = 0 WHERE pp.company_id = c.id)`);
+  }
   if (query.search) {
     const like = `%${String(query.search).trim()}%`;
     where.push(`(c.name LIKE ? OR c.industry LIKE ? OR c.profile LIKE ? OR c.city LIKE ?
@@ -268,7 +277,15 @@ function listCompanies(query = {}) {
   const clause = where.join(' AND ');
   const limit = Math.min(Number(query.limit) || 50, 500);
   const offset = Number(query.offset) || 0;
-  const rows = all(`${COMPANY_SELECT} WHERE ${clause} ORDER BY c.name LIMIT ? OFFSET ?`, ...params, limit, offset);
+  const rows = all(`${COMPANY_SELECT} WHERE ${clause} ORDER BY c.name LIMIT ? OFFSET ?`, ...params, limit, offset)
+    .map((row) => ({
+      ...row,
+      is_local: Boolean(row.is_local),
+      // Роль определяется фактическими связями, а не отдельным полем
+      role: row.projects_count && row.partner_projects_count ? 'both'
+        : row.partner_projects_count ? 'local'
+        : row.projects_count ? 'foreign' : (row.is_local ? 'local' : 'foreign'),
+    }));
   const total = get(
     `SELECT COUNT(*) AS n FROM companies c LEFT JOIN countries co ON co.id = c.country_id
      LEFT JOIN regions r ON r.id = co.region_id WHERE ${clause}`,

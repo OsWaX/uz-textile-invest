@@ -5,7 +5,7 @@
 import { api } from '../api.js';
 import { store } from '../store.js';
 import {
-  h, field, select, openModal, frag, toastOk, toastError, debounce, formatSize, AREA_LABELS, setChildren,
+  h, field, select, openModal, frag, toast, toastOk, toastError, debounce, formatSize, AREA_LABELS, setChildren,
 } from '../ui.js';
 
 /** Поля из конструктора форм для указанной формы. */
@@ -149,6 +149,62 @@ export function stepsEditor() {
 }
 
 
+
+/**
+ * Быстрое создание организации из формы проекта.
+ * Страна по умолчанию — Узбекистан; предупреждаем о похожих названиях.
+ */
+function openQuickCompanyForm(onCreated) {
+  const uzbekistan = store.reference.countries.find((c) => c.iso2 === 'UZ');
+  const nameInput = h('input', { type: 'text', maxlength: 300, placeholder: 'Полное наименование организации' });
+  const countrySelect = select(store.reference.countries.map((c) => ({ value: c.id, label: c.name_ru })),
+    { value: uzbekistan?.id || '' });
+  const cityInput = h('input', { type: 'text', maxlength: 120, placeholder: 'Город' });
+  const duplicateBox = h('div', { class: 'callout hidden' });
+  const errorBox = h('div', { class: 'callout danger hidden' });
+  const saveButton = h('button', { class: 'btn btn-primary', type: 'button' }, 'Создать организацию');
+
+  nameInput.addEventListener('input', debounce(async () => {
+    const term = nameInput.value.trim();
+    if (term.length < 3) { duplicateBox.classList.add('hidden'); return; }
+    const similar = await api.similarCompanies(term).catch(() => []);
+    if (!similar.length) { duplicateBox.classList.add('hidden'); return; }
+    duplicateBox.replaceChildren(
+      h('b', {}, 'Возможные дубликаты: '), similar.map((x) => x.name).join('; '),
+      h('div', { class: 'small mt-1' }, 'Проверьте, не заведена ли организация ранее.'));
+    duplicateBox.classList.remove('hidden');
+  }, 350));
+
+  const dialog = openModal({
+    title: 'Новая организация',
+    size: 'narrow',
+    body: h('div', {}, errorBox, duplicateBox,
+      field('Наименование', nameInput, { required: true }),
+      field('Страна', countrySelect, { required: true, help: 'По умолчанию — Узбекистан' }),
+      field('Город', cityInput)),
+    footer: frag(h('button', { class: 'btn', type: 'button', onclick: () => dialog.close() }, 'Отмена'), saveButton),
+  });
+
+  saveButton.onclick = async () => {
+    errorBox.classList.add('hidden');
+    saveButton.disabled = true;
+    try {
+      const created = await api.post('/api/companies', {
+        name: nameInput.value.trim(), country_id: countrySelect.value, city: cityInput.value.trim(),
+      });
+      await store.loadReference(true);
+      dialog.close();
+      toastOk(`Организация «${created.name}» добавлена в справочник.`);
+      onCreated(created);
+    } catch (error) {
+      errorBox.textContent = error.message;
+      errorBox.classList.remove('hidden');
+    } finally {
+      saveButton.disabled = false;
+    }
+  };
+}
+
 /**
  * Список местных партнёров (P-16, дополнение № 1 к ТЗ).
  * Партнёров может быть несколько; у каждого — необязательная роль в проекте.
@@ -156,15 +212,33 @@ export function stepsEditor() {
 export function partnersEditor(initial = []) {
   const rows = h('div', {});
 
+  const companyOptions = () => store.reference.companies_brief.map((c) => ({
+    value: c.id,
+    label: c.uz ? `${c.name} — Узбекистан` : `${c.name} (${c.country_name || 'зарубежная'})`,
+  }));
+
   const addRow = (data = {}) => {
-    const companySelect = select(
-      store.reference.companies_brief.map((c) => ({ value: c.id, label: c.uz ? `${c.name} — Узбекистан` : `${c.name} (${c.country_name || 'зарубежная'})` })),
-      { value: data.company_id || '', placeholder: '— выберите организацию —', name: 'company_id' }
-    );
+    const companySelect = select(companyOptions(), {
+      value: data.company_id || '', placeholder: '— выберите организацию —', name: 'company_id',
+    });
     const note = h('input', { type: 'text', name: 'role_note', maxlength: 200,
       placeholder: 'Роль в проекте: учредитель СП, площадка…', value: data.role_note || '' });
+
+    // Организации может не быть в справочнике — создаём её прямо здесь (п. 2.2 ТЗ)
+    const createButton = h('button', {
+      class: 'btn btn-sm', type: 'button', title: 'Создать организацию и выбрать её',
+      onclick: () => openQuickCompanyForm((created) => {
+        companySelect.replaceChildren();
+        companySelect.append(h('option', { value: '' }, '— выберите организацию —'));
+        for (const option of companyOptions()) {
+          companySelect.append(h('option', { value: String(option.value) }, option.label));
+        }
+        companySelect.value = String(created.id);
+      }),
+    }, '+ Новая');
+
     const row = h('div', { class: 'form-row', style: { marginBottom: '10px', alignItems: 'end' } },
-      companySelect, note,
+      companySelect, note, createButton,
       h('button', { class: 'btn btn-sm', type: 'button', title: 'Убрать партнёра', onclick: () => row.remove() }, '✕'));
     rows.append(row);
   };
@@ -323,6 +397,7 @@ export function openProjectForm({ project = null, onSaved }) {
         : await api.post('/api/projects', payload);
       dialog.close();
       toastOk(isEdit ? 'Изменения сохранены.' : `Создана запись ${saved.code}.`);
+      for (const warning of saved.warnings || []) toast(warning, { type: 'error', title: 'Обратите внимание' });
       onSaved?.(saved);
     } catch (error) {
       errorBox.textContent = error.message;

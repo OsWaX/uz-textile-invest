@@ -467,7 +467,23 @@ async function renderDictionaries() {
       ),
       h('div', { class: 'card mt-2' },
         h('div', { class: 'card-head' },
-          h('h2', {}, 'Страны и регионы'),
+          h('h2', {}, 'Регионы Узбекистана'),
+          h('span', { class: 'muted small' }, `${data.uz_regions.length} административных единиц`)),
+        h('div', { class: 'card-body' },
+          h('p', { class: 'small muted mb-0' },
+            'Места реализации инвестиционных проектов. Состав закрыт: значения переименовываются ' +
+            'и скрываются, но не добавляются и не удаляются. Регион, указанный хотя бы в одном проекте, отключить нельзя.')),
+        h('div', { class: 'card-body tight' },
+          h('div', { class: 'table-wrap' },
+            h('table', { class: 'data' },
+              h('thead', {}, h('tr', {},
+                h('th', {}, 'Название (рус.)'), h('th', {}, 'Название (узб.)'), h('th', {}, 'Название (англ.)'),
+                h('th', {}, 'Код'), h('th', {}, 'Состояние'), h('th', {}, ''))),
+              h('tbody', {}, data.uz_regions.map((region) => uzRegionRow(region, reload))))))),
+
+      h('div', { class: 'card mt-2' },
+        h('div', { class: 'card-head' },
+          h('h2', {}, 'Страны и регионы мира'),
           h('span', { class: 'muted small' }, `всего стран: ${data.countries.length}`)
         ),
         h('div', { class: 'card-body' },
@@ -489,6 +505,69 @@ async function renderDictionaries() {
 
   await reload();
   return container;
+}
+
+/** Строка справочника регионов Узбекистана (дополнение № 1 к ТЗ). */
+function uzRegionRow(region, reload) {
+  const patch = async (payload, message) => {
+    try {
+      await api.patch(`/api/admin/uz-regions/${region.id}`, payload);
+      toastOk(message);
+      await store.loadReference(true);
+      reload();
+    } catch (error) {
+      toastError(error.message);
+    }
+  };
+
+  return h('tr', {},
+    h('td', { class: 'strong' }, region.name_ru),
+    h('td', {}, region.name_uz || h('span', { class: 'muted' }, '—')),
+    h('td', {}, region.name_en || h('span', { class: 'muted' }, '—')),
+    h('td', { class: 'code' }, region.code),
+    h('td', {}, region.is_active
+      ? h('span', { class: 'tag tag-ok' }, 'Активен')
+      : h('span', { class: 'tag' }, 'Скрыт')),
+    h('td', {},
+      h('div', { class: 'flex', style: { gap: '4px' } },
+        h('button', { class: 'btn btn-sm', title: 'Изменить названия', onclick: () => openUzRegionForm(region, reload) }, '✎'),
+        h('button', {
+          class: 'btn btn-sm',
+          onclick: () => patch({ is_active: !region.is_active }, region.is_active ? 'Регион скрыт.' : 'Регион возвращён.'),
+        }, region.is_active ? 'Скрыть' : 'Вернуть'))));
+}
+
+function openUzRegionForm(region, reload) {
+  const nameRu = h('input', { type: 'text', value: region.name_ru, maxlength: 200 });
+  const nameUz = h('input', { type: 'text', value: region.name_uz || '', maxlength: 200 });
+  const nameEn = h('input', { type: 'text', value: region.name_en || '', maxlength: 200 });
+  const errorBox = h('div', { class: 'callout danger hidden' });
+  const saveButton = h('button', { class: 'btn btn-primary', type: 'button' }, 'Сохранить');
+
+  const dialog = openModal({
+    title: `Регион: ${region.name_ru}`,
+    body: h('div', {}, errorBox,
+      h('p', { class: 'small muted' }, `Код в базе данных: ${region.code}. Код изменить нельзя.`),
+      field('Название (русский)', nameRu, { required: true }),
+      h('div', { class: 'form-row' }, field('Название (узбекский)', nameUz), field('Название (английский)', nameEn))),
+    footer: frag(h('button', { class: 'btn', type: 'button', onclick: () => dialog.close() }, 'Отмена'), saveButton),
+  });
+
+  saveButton.onclick = async () => {
+    errorBox.classList.add('hidden');
+    try {
+      await api.patch(`/api/admin/uz-regions/${region.id}`, {
+        name_ru: nameRu.value.trim(), name_uz: nameUz.value.trim(), name_en: nameEn.value.trim(),
+      });
+      dialog.close();
+      toastOk('Название региона изменено.');
+      await store.loadReference(true);
+      reload();
+    } catch (error) {
+      errorBox.textContent = error.message;
+      errorBox.classList.remove('hidden');
+    }
+  };
 }
 
 function openDictForm({ kind, title, item = null, reload }) {
@@ -576,6 +655,7 @@ async function renderSettings() {
         'security.session_timeout_minutes': Number(controls['security.session_timeout_minutes'].value),
         'security.require_2fa': controls['security.require_2fa'].checked,
         'recycle_bin.retention_days': Number(controls['recycle_bin.retention_days'].value),
+        'projects.locations_for_export': controls['projects.locations_for_export'].checked,
         'attention.meeting_tbc_days': Number(controls['attention.meeting_tbc_days'].value),
         'org.name': controls['org.name'].value.trim(),
         'org.ministry': controls['org.ministry'].value.trim(),
@@ -635,6 +715,7 @@ async function renderSettings() {
           numberField('security.session_timeout_minutes', 5, 480),
           boolField('security.require_2fa'),
           numberField('recycle_bin.retention_days', 1, 365),
+          boolField('projects.locations_for_export'),
           h('div', { class: 'callout mt-2' },
             h('b', {}, 'Каналы уведомлений: '),
             `почта — ${data.channels.email.enabled ? `настроена (${data.channels.email.host})` : 'не настроена'}; `,

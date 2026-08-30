@@ -80,7 +80,16 @@ function saveLocations(projectId, list) {
     run('INSERT INTO project_locations (project_id, uz_region_id, locality, amount) VALUES (?, ?, ?, ?)',
       projectId, row.regionId, row.locality, row.amount);
   }
-  return rows.map((r) => `${r.name} (${r.locality})`).join('; ');
+
+  // Предупреждение, а не отказ: сумма по площадкам может превышать сумму проекта
+  // по объективным причинам, решение остаётся за пользователем (п. 3.3).
+  const allocated = rows.reduce((sum, r) => sum + (r.amount || 0), 0);
+  const project = get('SELECT amount FROM projects WHERE id = ?', projectId);
+  const warnings = [];
+  if (allocated && project?.amount && allocated > project.amount) {
+    warnings.push('Сумма по регионам превышает сумму проекта — проверьте распределение.');
+  }
+  return { summary: rows.map((r) => `${r.name} (${r.locality})`).join('; '), warnings };
 }
 
 function loadProject(id) {
@@ -188,6 +197,7 @@ router.post('/api/projects', async (ctx) => {
   const contacts = v.array(ctx.body.contacts, 'Контактные лица', { max: 20 });
   if (!contacts.length) throw badRequest('Укажите хотя бы одно контактное лицо иностранного партнёра (поле P-10)');
 
+  const warnings = [];
   const project = transaction(() => {
     const code = nextCode('PRJ', 'projects');
     const result = run(
@@ -225,7 +235,7 @@ router.post('/api/projects', async (ctx) => {
       if (!locationsAllowed(data.area) && v.array(ctx.body.locations, 'Регионы реализации').length) {
         throw badRequest('Регионы реализации указываются только для инвестиционных проектов');
       }
-      saveLocations(projectId, v.array(ctx.body.locations, 'Регионы реализации', { max: 20 }));
+      warnings.push(...saveLocations(projectId, v.array(ctx.body.locations, 'Регионы реализации', { max: 20 })).warnings);
     }
 
     cf.saveValues('project', 'project', projectId, ctx.body.custom_values || {}, user);
@@ -263,7 +273,7 @@ router.post('/api/projects', async (ctx) => {
     link: `/#/projects/${project.id}`,
   });
 
-  return project;
+  return { ...project, warnings };
 });
 
 // -------------------------------------------------------------------------
@@ -274,6 +284,7 @@ router.patch('/api/projects/:id', async (ctx) => {
   const before = loadProject(ctx.params.id);
 
   // Проектный менеджер может изменить только статус собственной записи.
+  const warnings = [];
   const beforePartners = partnersOf(before.id).map((x) => (x.role_note ? `${x.company_name} (${x.role_note})` : x.company_name)).join('; ');
   const beforeLocations = locationsOf(before.id).map((x) => `${x.region_name} (${x.locality})`).join('; ');
 
@@ -318,7 +329,7 @@ router.patch('/api/projects/:id', async (ctx) => {
       if (!locationsAllowed(area) && v.array(ctx.body.locations, 'Регионы реализации').length) {
         throw badRequest('Регионы реализации указываются только для инвестиционных проектов');
       }
-      saveLocations(before.id, v.array(ctx.body.locations, 'Регионы реализации', { max: 20 }));
+      warnings.push(...saveLocations(before.id, v.array(ctx.body.locations, 'Регионы реализации', { max: 20 })).warnings);
     }
     if (ctx.body.custom_values) cf.saveValues('project', 'project', before.id, ctx.body.custom_values, user);
   });
@@ -355,7 +366,7 @@ router.patch('/api/projects/:id', async (ctx) => {
       link: `/#/projects/${after.id}`,
     });
   }
-  return after;
+  return { ...after, warnings };
 });
 
 router.delete('/api/projects/:id', async (ctx) => {

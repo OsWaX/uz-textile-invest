@@ -67,6 +67,10 @@ export async function renderProjects({ query, navigate }) {
       { value: query.record_type || '', placeholder: 'Все типы', onchange: (e) => setQuery({ record_type: e.target.value, offset: 0 }) })),
     field('Регион Узбекистана', select(ref.uz_regions.map((r) => ({ value: r.code, label: r.name_ru })),
       { value: query.uz_region || '', placeholder: 'Все регионы Узбекистана', onchange: (e) => setQuery({ uz_region: e.target.value, offset: 0 }) })),
+    field('Местный партнёр', select(
+      ref.companies_brief.filter((c) => c.uz).map((c) => ({ value: c.id, label: c.name })),
+      { value: query.partner_company_id || '', placeholder: 'Любой местный партнёр',
+        onchange: (e) => setQuery({ partner_company_id: e.target.value, offset: 0 }) })),
     field('Сумма от', h('input', {
       type: 'number', value: query.amount_min || '', placeholder: '0',
       onchange: (e) => setQuery({ amount_min: e.target.value, offset: 0 }),
