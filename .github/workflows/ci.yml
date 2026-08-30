@@ -1,0 +1,27 @@
+name: Проверки
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  tests:
+    name: Тесты и проверка модулей
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Установка Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Проверка синтаксиса клиентских модулей
+        run: node --experimental-vm-modules scripts/check-frontend.js
+
+      - name: Приёмочные испытания, безопасность и модульные тесты
+        run: npm test
+
+      - name: Проверка сборки образа
+        run: docker build -t uz-textile-portal:ci .

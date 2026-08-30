@@ -3,11 +3,11 @@
 // ==========================================================================
 import { api } from '../api.js';
 import { store } from '../store.js';
-import {
-  h, frag, field, select, formatDate, formatDateTime, statusTag, confirmDialog, toastOk,
-  toastError, openModal, initials, relativeTime, renderComment, debounce,
-  DIRECTION_LABELS, daysUntil, plural, setChildren, column,
-} from '../ui.js';
+import { 
+  h, frag, field, select, formatDate, statusTag, confirmDialog, toastOk, toastError, openModal,
+  initials, relativeTime, renderComment, debounce, DIRECTION_LABELS, daysUntil, plural,
+  setChildren, column,
+ } from '../ui.js';
 import { openVisitForm, openCorrectionForm, uploadZone, fileRow } from './forms.js';
 
 export async function renderVisit({ params, navigate }) {

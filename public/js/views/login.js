@@ -2,7 +2,7 @@
 //  Страница входа в систему (п. 2.4 ТЗ).
 // ==========================================================================
 import { api } from '../api.js';
-import { h, field, toastError } from '../ui.js';
+import { h, field } from '../ui.js';
 
 const DEMO_ACCOUNTS = [
   { email: 'admin@textile.gov.uz', label: 'Администратор — руководитель Проектного офиса' },

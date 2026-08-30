@@ -8,7 +8,7 @@ import {
   renderComment, initials, confirmDialog, toastOk, toastError, openModal, daysUntil, plural,
   AREA_LABELS, STEP_STATE_LABELS, todayIso, setChildren, column,
 } from '../ui.js';
-import { openProjectForm, openCorrectionForm, uploadZone, fileRow, customFieldsBlock } from './forms.js';
+import { openProjectForm, openCorrectionForm, uploadZone, fileRow } from './forms.js';
 import { refreshNotificationBadge } from '../app.js';
 
 export async function renderProject({ params, navigate }) {

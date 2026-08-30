@@ -3,9 +3,10 @@
 // ==========================================================================
 import { api } from '../api.js';
 import { store } from '../store.js';
-import {
-  h, frag, field, select, formatDateTime, toastOk, toastError, ROLE_LABELS, initials, openModal, confirmDialog, column,
-} from '../ui.js';
+import { 
+  h, frag, field, select, formatDateTime, toastOk, toastError, ROLE_LABELS, initials,
+  openModal, column,
+ } from '../ui.js';
 
 export async function renderProfile() {
   const me = await api.me();

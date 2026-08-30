@@ -13,7 +13,7 @@
     "dev": "node --no-warnings=ExperimentalWarning --watch server/index.js",
     "seed": "node --no-warnings=ExperimentalWarning scripts/seed.js",
     "reset": "node --no-warnings=ExperimentalWarning scripts/seed.js --reset",
-    "test": "node --no-warnings=ExperimentalWarning --test tests/"
+    "test": "node --no-warnings=ExperimentalWarning --test tests/*.test.js"
   },
   "dependencies": {},
   "license": "UNLICENSED"

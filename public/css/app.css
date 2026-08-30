@@ -248,11 +248,28 @@ a:hover { text-decoration: underline; }
 
 .content { padding: 22px 24px 60px; flex: 1; min-width: 0; }
 .page-head { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
-.page-head .titles { min-width: 0; flex: 1; }
+.page-head .titles { min-width: 0; flex: 1 1 260px; }
 .page-head .subtitle { color: var(--ink-faint); font-size: 13px; margin-top: 3px; }
 .page-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .breadcrumbs { font-size: 12.5px; color: var(--ink-faint); margin-bottom: 8px; }
 .breadcrumbs a { color: var(--ink-faint); }
+
+@media (max-width: 700px) {
+  .page-head { flex-direction: column; align-items: stretch; }
+  /* в колоночной раскладке flex-basis влияет на высоту — сбрасываем его */
+  .page-head .titles { flex: none; }
+  .page-actions { width: 100%; }
+  .page-actions .btn, .page-actions a.btn { flex: 1 1 auto; justify-content: center; }
+  .filters { grid-template-columns: 1fr; }
+  .filters .field.wide { grid-column: span 1; }
+  .modal { max-height: 100vh; border-radius: 0; }
+  .modal-scrim { padding: 0; }
+  .def-list { grid-template-columns: 1fr 1fr; }
+  h1 { font-size: 19px; }
+  .kanban-col, .kanban-col { width: 84vw; min-width: 84vw; }
+  .cal-cell { min-height: 66px; font-size: 11px; }
+  .notif-panel { right: 6px; left: 6px; width: auto; }
+}
 
 @media (max-width: 1000px) {
   .app { grid-template-columns: 1fr; }

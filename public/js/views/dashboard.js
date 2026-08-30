@@ -3,9 +3,7 @@
 // ==========================================================================
 import { api } from '../api.js';
 import { store } from '../store.js';
-import {
-  h, frag, formatMoney, formatNumber, formatDate, daysUntil, plural, empty, select, statusTag, column,
-} from '../ui.js';
+import { h, frag, formatMoney, formatNumber, formatDate, daysUntil, plural, statusTag, column } from '../ui.js';
 import { donutChart, legend, barList, dynamicsChart, worldMap } from '../charts.js';
 
 export async function renderDashboard({ query, navigate }) {
