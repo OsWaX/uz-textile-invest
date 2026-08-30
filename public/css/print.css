@@ -1,0 +1,32 @@
+/* ==========================================================================
+   Печать документов: карточка проекта, программа визита, отчёты.
+   Открывается через «Печать / PDF» — документ формируется из текущих данных.
+   ========================================================================== */
+@media print {
+  @page { size: A4; margin: 14mm 14mm 16mm; }
+
+  body { background: #fff; color: #000; font-size: 11pt; }
+  .sidebar, .topbar, .page-actions, .filters, .filter-chips, .tabs,
+  .toast-stack, .notif-panel, .scrim, .btn, .dropzone, .pagination, .no-print { display: none !important; }
+  .app { display: block; }
+  .content { padding: 0; }
+  .card { border: none; box-shadow: none; margin-bottom: 10pt; break-inside: avoid; }
+  .card-head { border-bottom: 1pt solid #999; padding: 0 0 4pt; }
+  .card-body { padding: 6pt 0; }
+  a { color: #000; text-decoration: none; }
+  table.data th { background: #eee !important; color: #000; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  table.data td, table.data th { border-bottom: .5pt solid #bbb; padding: 4pt 6pt; }
+  .tag { border: .5pt solid #999; background: none !important; color: #000 !important; }
+
+  .print-header { display: block !important; margin-bottom: 12pt; border-bottom: 2pt solid #1f4e9e; padding-bottom: 8pt; }
+  .print-header .ministry { font-size: 9pt; text-transform: uppercase; letter-spacing: .06em; color: #444; }
+  .print-header .doc-title { font-size: 16pt; font-weight: 700; margin-top: 5pt; }
+  .print-header .doc-meta { font-size: 9pt; color: #444; margin-top: 4pt; }
+  .print-footer { display: block !important; margin-top: 14pt; border-top: .5pt solid #999; padding-top: 5pt; font-size: 8.5pt; color: #444; }
+  .print-only { display: block !important; }
+  .split { display: block; }
+  .grid-2, .grid-3, .grid-4 { display: block; }
+  .kpi { border: .5pt solid #999; margin-bottom: 6pt; page-break-inside: avoid; }
+}
+
+.print-header, .print-footer, .print-only { display: none; }
