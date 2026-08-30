@@ -65,6 +65,8 @@ export async function renderProjects({ query, navigate }) {
       { value: query.responsible_id || '', placeholder: 'Все сотрудники', onchange: (e) => setQuery({ responsible_id: e.target.value, offset: 0 }) })),
     field('Тип записи', select(ref.record_types.map((t) => ({ value: t.code, label: t.name_ru })),
       { value: query.record_type || '', placeholder: 'Все типы', onchange: (e) => setQuery({ record_type: e.target.value, offset: 0 }) })),
+    field('Регион Узбекистана', select(ref.uz_regions.map((r) => ({ value: r.code, label: r.name_ru })),
+      { value: query.uz_region || '', placeholder: 'Все регионы Узбекистана', onchange: (e) => setQuery({ uz_region: e.target.value, offset: 0 }) })),
     field('Сумма от', h('input', {
       type: 'number', value: query.amount_min || '', placeholder: '0',
       onchange: (e) => setQuery({ amount_min: e.target.value, offset: 0 }),
@@ -85,6 +87,7 @@ export async function renderProjects({ query, navigate }) {
     quickChip('Просроченные этапы', query.overdue === '1', () => setQuery({ overdue: query.overdue === '1' ? '' : '1', offset: 0 })),
     quickChip('Сроки в течение 7 дней', query.due_soon === '1', () => setQuery({ due_soon: query.due_soon === '1' ? '' : '1', offset: 0 })),
     quickChip(`Без активности более ${ref.settings.stale_days} дн.`, query.stale === '1', () => setQuery({ stale: query.stale === '1' ? '' : '1', offset: 0 })),
+    quickChip('Регион Узбекистана не указан', query.no_uz_region === '1', () => setQuery({ no_uz_region: query.no_uz_region === '1' ? '' : '1', offset: 0 })),
     Object.keys(query).length
       ? h('button', { class: 'chip', onclick: () => navigate('/projects') }, '✕ Сбросить фильтры')
       : null
@@ -174,8 +177,15 @@ function renderTable(data, state, setQuery, navigate) {
         h('a', { href: `#/projects/${project.id}`, class: 't-main' }, project.title),
         h('div', { class: 't-sub' },
           h('a', { href: `#/companies/${project.company_id}` }, project.company_name),
+          project.partner_names
+            ? h('span', {}, ' · ', project.partner_names.split('; ')[0],
+                project.partners_count > 1 ? ` и ещё ${project.partners_count - 1}` : '')
+            : null,
           ` · ${project.record_type_name} · ${AREA_LABELS[project.area]}`
-        )
+        ),
+        project.uz_region_names
+          ? h('div', { class: 't-sub', style: { color: 'var(--indigo)' } }, `📍 ${project.uz_region_names}`)
+          : null
       ),
       h('td', {}, statusTag(project.sector_name, project.sector_color)),
       h('td', {}, project.country_name, h('div', { class: 't-sub' }, project.region_name)),

@@ -12,6 +12,7 @@ router.get('/api/reference', async (ctx) => {
   ctx.requireUser();
   return {
     regions: reference.listRegions(),
+    uz_regions: reference.listUzRegions(),
     countries: reference.listCountries(),
     sectors: reference.listDictionary('sector'),
     record_types: reference.listDictionary('record_type'),
@@ -19,6 +20,13 @@ router.get('/api/reference', async (ctx) => {
     visit_statuses: reference.listDictionary('visit_status'),
     meeting_statuses: reference.listDictionary('meeting_status'),
     currencies: reference.listDictionary('currency'),
+    // Краткий список организаций для выбора местных партнёров: узбекские — первыми
+    companies_brief: all(
+      `SELECT c.id, c.name, co.name_ru AS country_name, (co.iso2 = 'UZ') AS uz
+       FROM companies c LEFT JOIN countries co ON co.id = c.country_id
+       WHERE c.is_deleted = 0 AND c.merged_into_id IS NULL
+       ORDER BY (co.iso2 = 'UZ') DESC, c.name`
+    ).map((row) => ({ ...row, uz: Boolean(row.uz) })),
     users: all(
       `SELECT u.id, u.full_name, u.email, u.role, u.region_id, u.position, r.name_ru AS region_name
        FROM users u LEFT JOIN regions r ON r.id = u.region_id
@@ -31,6 +39,7 @@ router.get('/api/reference', async (ctx) => {
     },
     settings: {
       stale_days: getSetting('projects.stale_days', 30),
+      locations_for_export: Boolean(getSetting('projects.locations_for_export', false)),
       org_name: getSetting('org.name', ''),
       ministry: getSetting('org.ministry', ''),
       rates: getSetting('currency.rates_to_usd', { USD: 1 }),

@@ -20,7 +20,15 @@ const PROJECT_SELECT = `
             AND s.state <> 'done' AND s.due_date IS NOT NULL AND s.due_date < date('now')) AS steps_overdue,
          (SELECT MIN(s.due_date) FROM roadmap_steps s WHERE s.project_id = p.id AND s.is_deleted = 0 AND s.state <> 'done') AS next_due_date,
          (SELECT s.title FROM roadmap_steps s WHERE s.project_id = p.id AND s.is_deleted = 0 AND s.state <> 'done'
-            ORDER BY s.due_date IS NULL, s.due_date, s.seq LIMIT 1) AS next_step_title
+            ORDER BY s.due_date IS NULL, s.due_date, s.seq LIMIT 1) AS next_step_title,
+         (SELECT COUNT(*) FROM project_partners pp WHERE pp.project_id = p.id) AS partners_count,
+         (SELECT GROUP_CONCAT(pc.name, '; ') FROM project_partners pp
+            JOIN companies pc ON pc.id = pp.company_id WHERE pp.project_id = p.id) AS partner_names,
+         (SELECT COUNT(*) FROM project_locations pl WHERE pl.project_id = p.id) AS locations_count,
+         (SELECT GROUP_CONCAT(ur.name_ru, '; ') FROM project_locations pl
+            JOIN uz_regions ur ON ur.id = pl.uz_region_id WHERE pl.project_id = p.id) AS uz_region_names,
+         (SELECT GROUP_CONCAT(pl.locality, '; ') FROM project_locations pl
+            WHERE pl.project_id = p.id) AS locality_names
   FROM projects p
   JOIN companies c   ON c.id = p.company_id
   JOIN countries co  ON co.id = p.country_id
@@ -51,6 +59,24 @@ function buildProjectFilters(query = {}) {
   if (query.region) push('r.code = ?', query.region);
   if (query.region_id) push('r.id = ?', Number(query.region_id));
   if (query.company_id) push('p.company_id = ?', Number(query.company_id));
+  // Местный партнёр (дополнение № 1 к ТЗ)
+  if (query.partner_company_id) {
+    push('EXISTS (SELECT 1 FROM project_partners pp WHERE pp.project_id = p.id AND pp.company_id = ?)',
+      Number(query.partner_company_id));
+  }
+  // Регион Узбекистана — допускается несколько кодов через запятую
+  if (query.uz_region) {
+    const codes = splitList(query.uz_region);
+    push(
+      `EXISTS (SELECT 1 FROM project_locations pl JOIN uz_regions ur ON ur.id = pl.uz_region_id
+               WHERE pl.project_id = p.id AND ur.code IN (${codes.map(() => '?').join(',')}))`,
+      ...codes
+    );
+  }
+  // Инвестиционные проекты без указанной площадки реализации
+  if (query.no_uz_region === '1' || query.no_uz_region === true) {
+    push("p.area = 'investment' AND NOT EXISTS (SELECT 1 FROM project_locations pl WHERE pl.project_id = p.id)");
+  }
   if (query.responsible_id) push('p.responsible_user_id = ?', Number(query.responsible_id));
   if (query.date_from) push('date(p.created_at) >= ?', query.date_from);
   if (query.date_to) push('date(p.created_at) <= ?', query.date_to);
@@ -75,12 +101,39 @@ function buildProjectFilters(query = {}) {
       `(p.title LIKE ? OR p.code LIKE ? OR p.description LIKE ? OR c.name LIKE ?
         OR EXISTS (SELECT 1 FROM contacts ct WHERE ct.entity_type = 'project' AND ct.entity_id = p.id
                    AND (ct.full_name LIKE ? OR ct.email LIKE ?))
-        OR EXISTS (SELECT 1 FROM comments cm WHERE cm.entity_type = 'project' AND cm.entity_id = p.id AND cm.body LIKE ?))`,
-      like, like, like, like, like, like, like
+        OR EXISTS (SELECT 1 FROM comments cm WHERE cm.entity_type = 'project' AND cm.entity_id = p.id AND cm.body LIKE ?)
+        OR EXISTS (SELECT 1 FROM project_partners pp JOIN companies pc ON pc.id = pp.company_id
+                   WHERE pp.project_id = p.id AND pc.name LIKE ?)
+        OR EXISTS (SELECT 1 FROM project_locations pl JOIN uz_regions ur ON ur.id = pl.uz_region_id
+                   WHERE pl.project_id = p.id AND (pl.locality LIKE ? OR ur.name_ru LIKE ?)))`,
+      like, like, like, like, like, like, like, like, like, like
     );
   }
   return { where: where.join(' AND '), params };
 }
+
+/** Местные партнёры проекта (P-16). */
+const partnersOf = (projectId) =>
+  all(
+    `SELECT pp.id, pp.company_id, pp.role_note, c.name AS company_name, c.city,
+            co.name_ru AS country_name
+     FROM project_partners pp
+     JOIN companies c ON c.id = pp.company_id
+     LEFT JOIN countries co ON co.id = c.country_id
+     WHERE pp.project_id = ? ORDER BY pp.id`,
+    projectId
+  );
+
+/** Регионы реализации проекта (P-17). */
+const locationsOf = (projectId) =>
+  all(
+    `SELECT pl.id, pl.uz_region_id, pl.locality, pl.amount,
+            ur.code AS region_code, ur.name_ru AS region_name
+     FROM project_locations pl
+     JOIN uz_regions ur ON ur.id = pl.uz_region_id
+     WHERE pl.project_id = ? ORDER BY ur.sort`,
+    projectId
+  );
 
 const splitList = (value) => String(value).split(',').map((s) => s.trim()).filter(Boolean);
 
@@ -128,6 +181,8 @@ function decorateProject(row) {
       !['completed', 'cancelled'].includes(row.status_code) &&
       Number.isFinite(lastActivity) && Date.now() - lastActivity > staleDays * 86400000,
     progress: row.steps_total ? Math.round((row.steps_done / row.steps_total) * 100) : 0,
+    partners: partnersOf(row.id),
+    locations: locationsOf(row.id),
   };
 }
 
@@ -225,7 +280,7 @@ function listCompanies(query = {}) {
 const allCompanies = (query = {}) => listCompanies({ ...query, limit: 5000 }).rows;
 
 module.exports = {
-  PROJECT_SELECT, VISIT_SELECT, COMPANY_SELECT,
+  PROJECT_SELECT, VISIT_SELECT, COMPANY_SELECT, partnersOf, locationsOf,
   listProjects, allProjects, buildProjectFilters, decorateProject,
   listVisits, allVisits, buildVisitFilters,
   listCompanies, allCompanies,

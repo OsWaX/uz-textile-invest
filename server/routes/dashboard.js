@@ -124,6 +124,55 @@ router.get('/api/dashboard', async (ctx) => {
      ORDER BY v.date_from LIMIT 10`
   );
 
+  // --- Разрез по регионам Узбекистана (дополнение № 1 к ТЗ) ---
+  // Проект с площадками в нескольких регионах учитывается в каждом из них,
+  // поэтому сумма по регионам может превышать общее число проектов.
+  const projectIds = projects.map((p) => p.id);
+  const placeholders = projectIds.length ? projectIds.map(() => '?').join(',') : 'NULL';
+  const locationRows = projectIds.length
+    ? all(
+        `SELECT pl.project_id, pl.locality, pl.amount, ur.code, ur.name_ru
+         FROM project_locations pl JOIN uz_regions ur ON ur.id = pl.uz_region_id
+         WHERE pl.project_id IN (${placeholders}) ORDER BY ur.sort`,
+        ...projectIds
+      )
+    : [];
+
+  const uzMap = new Map();
+  const projectsWithLocation = new Set();
+  for (const row of locationRows) {
+    projectsWithLocation.add(row.project_id);
+    if (!uzMap.has(row.code)) {
+      uzMap.set(row.code, { key: row.code, label: row.name_ru, count: 0, amount_usd: 0, localities: [] });
+    }
+    const bucket = uzMap.get(row.code);
+    bucket.count += 1;
+    // Решение Р-1: в разрез попадает только объём, заданный по этому региону
+    const project = projects.find((p) => p.id === row.project_id);
+    if (row.amount && project) bucket.amount_usd += toUsd(row.amount, project.currency);
+    if (row.locality && !bucket.localities.includes(row.locality)) bucket.localities.push(row.locality);
+  }
+
+  const investmentProjects = projects.filter((p) => p.area === 'investment');
+  const withoutLocation = investmentProjects.filter((p) => !projectsWithLocation.has(p.id));
+
+  // Объём, не отнесённый ни к одному региону (решение Р-1)
+  const allocatedByProject = new Map();
+  for (const row of locationRows) {
+    if (!row.amount) continue;
+    allocatedByProject.set(row.project_id, (allocatedByProject.get(row.project_id) || 0) + row.amount);
+  }
+  let unallocatedUsd = 0;
+  for (const project of investmentProjects) {
+    const allocated = allocatedByProject.get(project.id) || 0;
+    const rest = Math.max((project.amount || 0) - allocated, 0);
+    unallocatedUsd += toUsd(rest, project.currency);
+  }
+
+  const byUzRegion = [...uzMap.values()]
+    .map((r) => ({ ...r, amount_usd: Math.round(r.amount_usd) }))
+    .sort((a, b) => b.count - a.count || b.amount_usd - a.amount_usd);
+
   // Динамика по месяцам за 12 месяцев
   const dynamics = all(
     `SELECT strftime('%Y-%m', p.created_at) AS month, COUNT(*) AS count,
@@ -162,6 +211,14 @@ router.get('/api/dashboard', async (ctx) => {
     by_region: groupBy(projects, (p) => p.region_code, (p) => p.region_name).map((r) => ({ ...r, amount_usd: Math.round(r.amount_usd) })),
     by_country: groupBy(projects, (p) => p.iso2, (p) => p.country_name).map((r) => ({ ...r, amount_usd: Math.round(r.amount_usd) })),
     by_manager: groupBy(projects, (p) => p.responsible_user_id, (p) => p.responsible_name).map((r) => ({ ...r, amount_usd: Math.round(r.amount_usd) })),
+    by_uz_region: byUzRegion,
+    uz_summary: {
+      regions_total: get('SELECT COUNT(*) AS n FROM uz_regions WHERE is_active = 1')?.n ?? 0,
+      regions_covered: byUzRegion.length,
+      investment_total: investmentProjects.length,
+      without_location: withoutLocation.length,
+      unallocated_usd: Math.round(unallocatedUsd),
+    },
     dynamics,
     attention: {
       overdue_steps: overdueSteps,

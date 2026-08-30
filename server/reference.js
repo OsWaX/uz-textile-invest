@@ -2,6 +2,7 @@
 /** Инициализация справочников и настроек по умолчанию (идемпотентно). */
 const { run, get, all, transaction, getSetting, setSetting } = require('./db');
 const { REGIONS, COUNTRIES } = require('./data/geo');
+const { UZ_REGIONS } = require('./data/uz-regions');
 
 const DICTIONARIES = {
   sector: [
@@ -59,6 +60,9 @@ const DEFAULT_RATES = {
   TRY: 0.029, AED: 0.272, GBP: 1.27, KRW: 0.00073, JPY: 0.0066,
 };
 
+/** Метка отсутствующей записи — не совпадает ни с одним хранимым значением. */
+const MISSING = Symbol('setting-missing');
+
 const DEFAULT_SETTINGS = {
   'reminders.days_before': [7, 3, 1],
   'reminders.escalate_overdue': true,
@@ -71,7 +75,10 @@ const DEFAULT_SETTINGS = {
   'attention.meeting_tbc_days': 7,
   'currency.rates_to_usd': DEFAULT_RATES,
   'org.name': 'Проектный офис заместителя министра по текстильной промышленности',
-  'org.ministry': 'Министерство инвестиций, промышленности и торговли Республики Узбекистан',
+  'org.ministry': 'Агентство по развитию легкой промышленности при Кабинете Министров Республики Узбекистан',
+  // Дополнение № 1 к ТЗ, решение Р-3: регионы реализации — только для инвестиционных
+  // проектов; переключатель распространяет поле и на экспортные записи.
+  'projects.locations_for_export': false,
 };
 
 function ensureReference() {
@@ -98,6 +105,15 @@ function ensureReference() {
       }
     }
 
+    UZ_REGIONS.forEach((region, index) => {
+      run(
+        `INSERT INTO uz_regions (code, name_ru, name_uz, name_en, sort) VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(code) DO UPDATE SET name_ru = excluded.name_ru, name_uz = excluded.name_uz,
+           name_en = excluded.name_en, sort = excluded.sort`,
+        region.code, region.name_ru, region.name_uz, region.name_en, index + 1
+      );
+    });
+
     for (const [kind, items] of Object.entries(DICTIONARIES)) {
       items.forEach((item, index) => {
         run(
@@ -109,8 +125,18 @@ function ensureReference() {
       });
     }
 
+    // Отличаем «настройки нет в базе» от «значение равно null»: передавать сюда
+    // undefined нельзя — параметр getSetting по умолчанию равен null.
     for (const [key, value] of Object.entries(DEFAULT_SETTINGS)) {
-      if (getSetting(key, undefined) === undefined) setSetting(key, value);
+      if (getSetting(key, MISSING) === MISSING) setSetting(key, value);
+    }
+
+    // Смена наименования организации в уже развёрнутых системах.
+    // Заменяем только прежнее значение по умолчанию: собственную формулировку
+    // администратора не трогаем.
+    const PREVIOUS_ORG = 'Министерство инвестиций, промышленности и торговли Республики Узбекистан';
+    if (getSetting('org.ministry', '') === PREVIOUS_ORG) {
+      setSetting('org.ministry', DEFAULT_SETTINGS['org.ministry']);
     }
   });
 }
@@ -120,10 +146,12 @@ const listCountries = () =>
   all(`SELECT c.*, r.code AS region_code, r.name_ru AS region_name
        FROM countries c JOIN regions r ON r.id = c.region_id
        WHERE c.is_active = 1 ORDER BY c.name_ru`);
+const listUzRegions = (includeInactive = false) =>
+  all(`SELECT * FROM uz_regions${includeInactive ? '' : ' WHERE is_active = 1'} ORDER BY sort, id`);
 const listDictionary = (kind, includeInactive = false) =>
   all(
     `SELECT * FROM dictionaries WHERE kind = ?${includeInactive ? '' : ' AND is_active = 1'} ORDER BY sort, id`,
     kind
   );
 
-module.exports = { ensureReference, listRegions, listCountries, listDictionary, DICTIONARIES, DEFAULT_SETTINGS, DEFAULT_RATES };
+module.exports = { ensureReference, listRegions, listCountries, listUzRegions, listDictionary, DICTIONARIES, DEFAULT_SETTINGS, DEFAULT_RATES };

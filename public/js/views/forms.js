@@ -148,6 +148,83 @@ export function stepsEditor() {
   return { node, read };
 }
 
+
+/**
+ * Список местных партнёров (P-16, дополнение № 1 к ТЗ).
+ * Партнёров может быть несколько; у каждого — необязательная роль в проекте.
+ */
+export function partnersEditor(initial = []) {
+  const rows = h('div', {});
+
+  const addRow = (data = {}) => {
+    const companySelect = select(
+      store.reference.companies_brief.map((c) => ({ value: c.id, label: c.uz ? `${c.name} — Узбекистан` : `${c.name} (${c.country_name || 'зарубежная'})` })),
+      { value: data.company_id || '', placeholder: '— выберите организацию —', name: 'company_id' }
+    );
+    const note = h('input', { type: 'text', name: 'role_note', maxlength: 200,
+      placeholder: 'Роль в проекте: учредитель СП, площадка…', value: data.role_note || '' });
+    const row = h('div', { class: 'form-row', style: { marginBottom: '10px', alignItems: 'end' } },
+      companySelect, note,
+      h('button', { class: 'btn btn-sm', type: 'button', title: 'Убрать партнёра', onclick: () => row.remove() }, '✕'));
+    rows.append(row);
+  };
+  (initial.length ? initial : []).forEach(addRow);
+
+  const node = h('div', {},
+    h('div', { class: 'form-section-title' }, 'Местные партнёры (Узбекистан)'),
+    h('p', { class: 'help', style: { marginTop: '-4px', marginBottom: '10px' } },
+      'Узбекская сторона проекта. Партнёров может быть несколько; поле необязательное.'),
+    rows,
+    h('button', { class: 'btn btn-sm', type: 'button', onclick: () => addRow() }, '+ Добавить партнёра'));
+
+  const read = () => [...rows.children].map((row) => ({
+    company_id: row.querySelector('[name=company_id]').value,
+    role_note: row.querySelector('[name=role_note]').value.trim(),
+  })).filter((x) => x.company_id);
+
+  return { node, read };
+}
+
+/**
+ * Регионы реализации (P-17). Регион выбирается из закрытого списка,
+ * населённый пункт обязателен, объём в регионе — необязателен.
+ */
+export function locationsEditor(initial = [], { visible = true } = {}) {
+  const rows = h('div', {});
+
+  const addRow = (data = {}) => {
+    const regionSelect = select(
+      store.reference.uz_regions.map((r) => ({ value: r.id, label: r.name_ru })),
+      { value: data.uz_region_id || '', placeholder: '— выберите регион —', name: 'uz_region_id' }
+    );
+    const locality = h('input', { type: 'text', name: 'locality', maxlength: 200,
+      placeholder: 'Город или район *', value: data.locality || '' });
+    const amount = h('input', { type: 'number', name: 'amount', min: '0', step: '1000',
+      placeholder: 'Объём в регионе', value: data.amount ?? '' });
+    const row = h('div', { class: 'form-row', style: { marginBottom: '10px', alignItems: 'end' } },
+      regionSelect, locality, amount,
+      h('button', { class: 'btn btn-sm', type: 'button', title: 'Убрать регион', onclick: () => row.remove() }, '✕'));
+    rows.append(row);
+  };
+  initial.forEach(addRow);
+
+  const node = h('div', { class: visible ? '' : 'hidden' },
+    h('div', { class: 'form-section-title' }, 'Регионы реализации в Узбекистане'),
+    h('p', { class: 'help', style: { marginTop: '-4px', marginBottom: '10px' } },
+      'Для каждого выбранного региона укажите город или район. Объём в регионе заполняется, ' +
+      'если инвестиции распределены между площадками, — иначе сумма проекта попадёт в строку «Не распределено».'),
+    rows,
+    h('button', { class: 'btn btn-sm', type: 'button', onclick: () => addRow() }, '+ Добавить регион'));
+
+  const read = () => [...rows.children].map((row) => ({
+    uz_region_id: row.querySelector('[name=uz_region_id]').value,
+    locality: row.querySelector('[name=locality]').value.trim(),
+    amount: row.querySelector('[name=amount]').value,
+  })).filter((x) => x.uz_region_id);
+
+  return { node, read, setVisible: (on) => node.classList.toggle('hidden', !on) };
+}
+
 // --------------------------------------------------------------------------
 //  Проект / соглашение
 // --------------------------------------------------------------------------
@@ -172,6 +249,10 @@ export function openProjectForm({ project = null, onSaved }) {
   };
 
   const companyPicker = buildCompanyPicker(project?.company_id, project?.company_name);
+  const partners = partnersEditor(project?.partners || []);
+  const locationsAllowed = (area) => area === 'investment' || store.reference.settings.locations_for_export;
+  const locations = locationsEditor(project?.locations || [], { visible: locationsAllowed(controls.area.value) });
+  controls.area.addEventListener('change', () => locations.setVisible(locationsAllowed(controls.area.value)));
   const contacts = isEdit ? null : contactsEditor();
   const steps = isEdit ? null : stepsEditor();
   const custom = customFieldsBlock('project', project?.custom_values || {});
@@ -191,12 +272,14 @@ export function openProjectForm({ project = null, onSaved }) {
       field('Ответственный', controls.responsible_user_id, { required: true }),
       field('Статус', controls.status_code, { required: true })
     ),
-    field('Компания / организация', companyPicker.node, { required: true }),
+    field('Иностранный партнёр', companyPicker.node, { required: true }),
+    partners.node,
     h('div', { class: 'form-row' },
       field('Сумма', controls.amount),
       field('Валюта', controls.currency)
     ),
     field('Описание', controls.description),
+    locations.node,
     contacts?.node,
     steps?.node,
     custom.node
@@ -227,6 +310,8 @@ export function openProjectForm({ project = null, onSaved }) {
         currency: controls.currency.value,
         responsible_user_id: controls.responsible_user_id.value,
         status_code: controls.status_code.value,
+        partners: partners.read(),
+        locations: locationsAllowed(controls.area.value) ? locations.read() : [],
         custom_values: custom.read(),
       };
       if (!isEdit) {

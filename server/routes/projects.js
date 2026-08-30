@@ -2,7 +2,7 @@
 /** Модуль «Проекты / Соглашения» (раздел 3 ТЗ). */
 const { Router, notFound, badRequest, forbidden } = require('../lib/http');
 const { all, get, run, transaction, nextCode, getSetting } = require('../db');
-const { listProjects, PROJECT_SELECT, decorateProject } = require('../queries');
+const { listProjects, PROJECT_SELECT, decorateProject, partnersOf, locationsOf } = require('../queries');
 const rbac = require('../rbac');
 const audit = require('../audit');
 const notify = require('../notify');
@@ -17,9 +17,71 @@ const FIELD_LABELS = {
   country_id: 'Страна', company_id: 'Компания', title: 'Название',
   description: 'Описание', amount: 'Сумма', currency: 'Валюта',
   responsible_user_id: 'Ответственный', status_code: 'Статус',
+  partners: 'Местные партнёры', locations: 'Регионы реализации',
 };
 
 const dictCodes = (kind) => all('SELECT code FROM dictionaries WHERE kind = ? AND is_active = 1', kind).map((r) => r.code);
+
+
+/** Регионы реализации доступны инвестиционным проектам (решение Р-3 дополнения № 1). */
+function locationsAllowed(area) {
+  return area === 'investment' || Boolean(getSetting('projects.locations_for_export', false));
+}
+
+/**
+ * Сохраняет список местных партнёров (P-16). Возвращает текстовое описание
+ * состава для журнала аудита.
+ */
+function savePartners(projectId, list, foreignCompanyId) {
+  const seen = new Set();
+  const rows = [];
+  for (const item of list) {
+    const companyId = v.int(item.company_id, 'Местный партнёр');
+    if (!companyId) continue; // пустые строки формы отбрасываем
+    if (companyId === Number(foreignCompanyId)) {
+      throw badRequest('Иностранный и местный партнёр не могут быть одной организацией');
+    }
+    const company = get('SELECT name FROM companies WHERE id = ? AND is_deleted = 0', companyId);
+    if (!company) throw badRequest('Компания местного партнёра не найдена');
+    if (seen.has(companyId)) throw badRequest(`Компания «${company.name}» уже указана как местный партнёр`);
+    seen.add(companyId);
+    rows.push({ companyId, name: company.name, note: v.str(item.role_note, 'Роль в проекте', { max: 200 }) });
+  }
+
+  run('DELETE FROM project_partners WHERE project_id = ?', projectId);
+  for (const row of rows) {
+    run('INSERT INTO project_partners (project_id, company_id, role_note) VALUES (?, ?, ?)',
+      projectId, row.companyId, row.note);
+  }
+  return rows.map((r) => (r.note ? `${r.name} (${r.note})` : r.name)).join('; ');
+}
+
+/**
+ * Сохраняет регионы реализации (P-17). Населённый пункт обязателен,
+ * повтор региона запрещён.
+ */
+function saveLocations(projectId, list) {
+  const seen = new Set();
+  const rows = [];
+  for (const item of list) {
+    const regionId = v.int(item.uz_region_id, 'Регион реализации');
+    if (!regionId) continue;
+    const region = get('SELECT name_ru FROM uz_regions WHERE id = ? AND is_active = 1', regionId);
+    if (!region) throw badRequest('Регион Узбекистана не найден в справочнике');
+    if (seen.has(regionId)) throw badRequest(`Регион «${region.name_ru}» уже добавлен`);
+    seen.add(regionId);
+    const locality = v.str(item.locality, 'Город или район', { max: 200 });
+    if (!locality) throw badRequest(`Для региона «${region.name_ru}» укажите город или район`);
+    rows.push({ regionId, name: region.name_ru, locality, amount: v.money(item.amount, 'Объём в регионе') });
+  }
+
+  run('DELETE FROM project_locations WHERE project_id = ?', projectId);
+  for (const row of rows) {
+    run('INSERT INTO project_locations (project_id, uz_region_id, locality, amount) VALUES (?, ?, ?, ?)',
+      projectId, row.regionId, row.locality, row.amount);
+  }
+  return rows.map((r) => `${r.name} (${r.locality})`).join('; ');
+}
 
 function loadProject(id) {
   const row = get(`${PROJECT_SELECT} WHERE p.id = ? AND p.is_deleted = 0`, Number(id));
@@ -56,6 +118,7 @@ router.get('/api/projects/:id', async (ctx) => {
   const custom = cf.valuesFor('project', project.id, user.id);
   return {
     ...project,
+    locations_allowed: locationsAllowed(project.area),
     steps: stepsOf(project.id),
     contacts: all("SELECT * FROM contacts WHERE entity_type = 'project' AND entity_id = ? ORDER BY id", project.id),
     comments: entities.listComments('project', project.id),
@@ -155,6 +218,16 @@ router.post('/api/projects', async (ctx) => {
       projectId, data.status_code, 'Создание записи', user.id
     );
 
+    if (Object.prototype.hasOwnProperty.call(ctx.body, 'partners')) {
+      savePartners(projectId, v.array(ctx.body.partners, 'Местные партнёры', { max: 30 }), data.company_id);
+    }
+    if (Object.prototype.hasOwnProperty.call(ctx.body, 'locations')) {
+      if (!locationsAllowed(data.area) && v.array(ctx.body.locations, 'Регионы реализации').length) {
+        throw badRequest('Регионы реализации указываются только для инвестиционных проектов');
+      }
+      saveLocations(projectId, v.array(ctx.body.locations, 'Регионы реализации', { max: 20 }));
+    }
+
     cf.saveValues('project', 'project', projectId, ctx.body.custom_values || {}, user);
 
     // Этапы дорожной карты можно передать сразу при создании.
@@ -201,6 +274,9 @@ router.patch('/api/projects/:id', async (ctx) => {
   const before = loadProject(ctx.params.id);
 
   // Проектный менеджер может изменить только статус собственной записи.
+  const beforePartners = partnersOf(before.id).map((x) => (x.role_note ? `${x.company_name} (${x.role_note})` : x.company_name)).join('; ');
+  const beforeLocations = locationsOf(before.id).map((x) => `${x.region_name} (${x.locality})`).join('; ');
+
   const onlyStatus = Object.keys(ctx.body).every((key) => key === 'status_code' || key === 'status_comment');
   if (!rbac.can(user, 'project.edit')) {
     if (!onlyStatus) {
@@ -210,7 +286,10 @@ router.patch('/api/projects/:id', async (ctx) => {
   }
 
   const data = readProjectPayload(ctx.body, user, { partial: true });
-  if (!Object.keys(data).length && !ctx.body.custom_values) throw badRequest('Нет данных для изменения');
+  const touchesLists = ['partners', 'locations'].some((key) => Object.prototype.hasOwnProperty.call(ctx.body, key));
+  if (!Object.keys(data).length && !ctx.body.custom_values && !touchesLists) {
+    throw badRequest('Нет данных для изменения');
+  }
 
   transaction(() => {
     if (Object.keys(data).length) {
@@ -226,6 +305,21 @@ router.patch('/api/projects/:id', async (ctx) => {
         before.id, before.status_code, data.status_code, v.str(ctx.body.status_comment, 'Комментарий', { max: 1000 }), user.id
       );
     }
+    if (touchesLists) {
+      run("UPDATE projects SET updated_by = ?, updated_at = datetime('now'), last_activity_at = datetime('now') WHERE id = ?",
+        user.id, before.id);
+    }
+    if (Object.prototype.hasOwnProperty.call(ctx.body, 'partners')) {
+      savePartners(before.id, v.array(ctx.body.partners, 'Местные партнёры', { max: 30 }),
+        data.company_id ?? before.company_id);
+    }
+    if (Object.prototype.hasOwnProperty.call(ctx.body, 'locations')) {
+      const area = data.area ?? before.area;
+      if (!locationsAllowed(area) && v.array(ctx.body.locations, 'Регионы реализации').length) {
+        throw badRequest('Регионы реализации указываются только для инвестиционных проектов');
+      }
+      saveLocations(before.id, v.array(ctx.body.locations, 'Регионы реализации', { max: 20 }));
+    }
     if (ctx.body.custom_values) cf.saveValues('project', 'project', before.id, ctx.body.custom_values, user);
   });
 
@@ -234,6 +328,16 @@ router.patch('/api/projects/:id', async (ctx) => {
     Object.fromEntries(Object.keys(data).map((k) => [k, before[k]])),
     data, FIELD_LABELS
   );
+
+  // Списки сравниваем отдельно: журнал должен показывать состав до и после
+  const afterPartners = partnersOf(before.id).map((x) => (x.role_note ? `${x.company_name} (${x.role_note})` : x.company_name)).join('; ');
+  const afterLocations = locationsOf(before.id).map((x) => `${x.region_name} (${x.locality})`).join('; ');
+  if (afterPartners !== beforePartners) {
+    changes.push({ field: 'partners', label: FIELD_LABELS.partners, from: beforePartners || null, to: afterPartners || null });
+  }
+  if (afterLocations !== beforeLocations) {
+    changes.push({ field: 'locations', label: FIELD_LABELS.locations, from: beforeLocations || null, to: afterLocations || null });
+  }
   audit.record({
     user,
     action: data.status_code && data.status_code !== before.status_code ? 'status_change' : 'update',

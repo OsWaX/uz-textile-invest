@@ -185,6 +185,43 @@ CREATE INDEX IF NOT EXISTS idx_projects_company ON projects(company_id);
 CREATE INDEX IF NOT EXISTS idx_projects_resp ON projects(responsible_user_id);
 CREATE INDEX IF NOT EXISTS idx_projects_deleted ON projects(is_deleted);
 
+-- Местные партнёры проекта: узбекская сторона (P-16, дополнение № 1 к ТЗ).
+-- Партнёров может быть несколько; хранятся в общем справочнике компаний.
+CREATE TABLE IF NOT EXISTS project_partners (
+  id         INTEGER PRIMARY KEY,
+  project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  company_id INTEGER NOT NULL REFERENCES companies(id),
+  role_note  TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (project_id, company_id)
+);
+CREATE INDEX IF NOT EXISTS idx_partners_project ON project_partners(project_id);
+CREATE INDEX IF NOT EXISTS idx_partners_company ON project_partners(company_id);
+
+-- Справочник 14 регионов Республики Узбекистан (дополнение № 1 к ТЗ).
+CREATE TABLE IF NOT EXISTS uz_regions (
+  id        INTEGER PRIMARY KEY,
+  code      TEXT NOT NULL UNIQUE,
+  name_ru   TEXT NOT NULL,
+  name_uz   TEXT NOT NULL DEFAULT '',
+  name_en   TEXT NOT NULL DEFAULT '',
+  sort      INTEGER NOT NULL DEFAULT 0,
+  is_active INTEGER NOT NULL DEFAULT 1
+);
+
+-- Регионы реализации проекта (P-17): регион + населённый пункт + объём.
+CREATE TABLE IF NOT EXISTS project_locations (
+  id           INTEGER PRIMARY KEY,
+  project_id   INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  uz_region_id INTEGER NOT NULL REFERENCES uz_regions(id),
+  locality     TEXT NOT NULL,
+  amount       REAL,
+  created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (project_id, uz_region_id)
+);
+CREATE INDEX IF NOT EXISTS idx_locations_project ON project_locations(project_id);
+CREATE INDEX IF NOT EXISTS idx_locations_region ON project_locations(uz_region_id);
+
 CREATE TABLE IF NOT EXISTS project_status_history (
   id          INTEGER PRIMARY KEY,
   project_id  INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,

@@ -25,6 +25,9 @@ const PROJECT_COLUMNS = [
   { header: 'Страна', key: 'country_name', width: 18 },
   { header: 'Регион', key: 'region_name', width: 20 },
   { header: 'Компания', key: 'company_name', width: 32 },
+  { header: 'Местные партнёры', key: 'partner_names', width: 34 },
+  { header: 'Регионы реализации', key: 'uz_region_names', width: 30 },
+  { header: 'Города и районы', key: 'locality_names', width: 28 },
   { header: 'Статус', key: 'status_name', width: 22 },
   { header: 'Сумма', key: 'amount', type: 'money', width: 16 },
   { header: 'Валюта', key: 'currency', width: 10 },
@@ -119,11 +122,42 @@ function stepRows(query) {
   }));
 }
 
+/** Построчная выгрузка: одна строка на пару «проект — регион реализации». */
+function uzLocationRows() {
+  return all(
+    `SELECT p.code, p.title, ur.name_ru AS region_name, pl.locality, pl.amount AS region_amount,
+            p.amount AS project_amount, p.currency, d.name_ru AS status_name,
+            u.full_name AS responsible_name,
+            (SELECT GROUP_CONCAT(c2.name, '; ') FROM project_partners pp2
+               JOIN companies c2 ON c2.id = pp2.company_id WHERE pp2.project_id = p.id) AS partner_names
+     FROM project_locations pl
+     JOIN projects p ON p.id = pl.project_id AND p.is_deleted = 0
+     JOIN uz_regions ur ON ur.id = pl.uz_region_id
+     LEFT JOIN dictionaries d ON d.kind = 'project_status' AND d.code = p.status_code
+     LEFT JOIN users u ON u.id = p.responsible_user_id
+     ORDER BY ur.sort, p.code`
+  );
+}
+
+const UZ_LOCATION_COLUMNS = [
+  { header: 'Код проекта', key: 'code', width: 14 },
+  { header: 'Название', key: 'title', width: 46 },
+  { header: 'Регион Узбекистана', key: 'region_name', width: 28 },
+  { header: 'Город или район', key: 'locality', width: 26 },
+  { header: 'Объём в регионе', key: 'region_amount', type: 'money', width: 18 },
+  { header: 'Сумма проекта', key: 'project_amount', type: 'money', width: 18 },
+  { header: 'Валюта', key: 'currency', width: 10 },
+  { header: 'Местные партнёры', key: 'partner_names', width: 34 },
+  { header: 'Статус', key: 'status_name', width: 22 },
+  { header: 'Ответственный', key: 'responsible_name', width: 26 },
+];
+
 const DATASETS = {
   projects: { name: 'Проекты и соглашения', columns: () => [...PROJECT_COLUMNS, ...cf.exportColumns('project')], rows: projectRows },
   visits:   { name: 'Визиты', columns: () => [...VISIT_COLUMNS, ...cf.exportColumns('visit')], rows: visitRows },
   companies:{ name: 'Компании', columns: () => COMPANY_COLUMNS, rows: (q) => allCompanies(q) },
   steps:    { name: 'Этапы дорожных карт', columns: () => STEP_COLUMNS, rows: stepRows },
+  uz_locations: { name: 'Проекты по регионам Узбекистана', columns: () => UZ_LOCATION_COLUMNS, rows: uzLocationRows },
 };
 
 const fileTimestamp = () => new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
@@ -182,8 +216,22 @@ router.get('/api/export/report/portfolio', async (ctx) => {
     { header: 'Сумма, USD', key: 'amount_usd', type: 'money', width: 20 },
   ];
 
+  // Разрез по регионам Узбекистана: проект учитывается в каждом своём регионе
+  const uzRows = all(
+    `SELECT ur.name_ru AS label, COUNT(DISTINCT pl.project_id) AS count,
+            COUNT(DISTINCT CASE WHEN p.status_code IN ('agreement_signed','implementation','completed')
+                  THEN pl.project_id END) AS signed,
+            COALESCE(SUM(pl.amount), 0) AS amount_usd,
+            GROUP_CONCAT(DISTINCT pl.locality) AS localities
+     FROM project_locations pl
+     JOIN uz_regions ur ON ur.id = pl.uz_region_id
+     JOIN projects p ON p.id = pl.project_id AND p.is_deleted = 0
+     GROUP BY ur.id ORDER BY count DESC, ur.sort`
+  ).map((row) => ({ ...row, amount_usd: Math.round(row.amount_usd), localities: (row.localities || '').split(',').join('; ') }));
+
   const workbook = buildWorkbook([
     { name: 'По регионам', columns: summaryColumns, rows: summarize((p) => p.region_code, (p) => p.region_name) },
+    { name: 'По регионам Узбекистана', columns: [...summaryColumns, { header: 'Города и районы', key: 'localities', width: 40 }], rows: uzRows },
     { name: 'По отраслям', columns: summaryColumns, rows: summarize((p) => p.sector_code, (p) => p.sector_name) },
     { name: 'По статусам', columns: summaryColumns, rows: summarize((p) => p.status_code, (p) => p.status_name) },
     { name: 'По менеджерам', columns: summaryColumns, rows: summarize((p) => p.responsible_user_id, (p) => p.responsible_name) },

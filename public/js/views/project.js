@@ -121,7 +121,12 @@ function overviewCard(project) {
         def('Отрасль', project.sector_name),
         def('Направление', AREA_LABELS[project.area]),
         def('Страна и регион', `${project.country_name} · ${project.region_name}`),
-        def('Компания', h('a', { href: `#/companies/${project.company_id}` }, project.company_name)),
+        def('Иностранный партнёр', h('a', { href: `#/companies/${project.company_id}` }, project.company_name)),
+        def('Местные партнёры', project.partners?.length
+          ? h('div', {}, project.partners.map((x, i) => h('div', { style: i ? { marginTop: '3px' } : {} },
+              h('a', { href: `#/companies/${x.company_id}` }, x.company_name),
+              x.role_note ? h('span', { class: 'muted small' }, ` — ${x.role_note}`) : null)))
+          : h('span', { class: 'muted' }, 'не указаны')),
         def('Сумма', formatMoney(project.amount, project.currency)),
         def('Ответственный', project.responsible_name),
         def('Статус', statusTag(project.status_name, project.status_color)),
@@ -132,6 +137,21 @@ function overviewCard(project) {
       ),
       project.description
         ? frag(h('div', { class: 'form-section-title' }, 'Описание'), h('p', { class: 'mb-0' }, project.description))
+        : null,
+      project.locations?.length
+        ? frag(
+            h('div', { class: 'form-section-title' }, 'Регионы реализации в Узбекистане'),
+            !project.locations_allowed
+              ? h('p', { class: 'small muted' },
+                  'Заполнено, когда запись относилась к инвестиционным проектам.')
+              : null,
+            h('div', { class: 'table-wrap' }, h('table', { class: 'data' },
+              h('thead', {}, h('tr', {},
+                h('th', {}, 'Регион'), h('th', {}, 'Город или район'), h('th', { class: 'num' }, 'Объём в регионе'))),
+              h('tbody', {}, project.locations.map((loc) => h('tr', {},
+                h('td', { class: 'strong' }, loc.region_name),
+                h('td', {}, loc.locality),
+                h('td', { class: 'num' }, loc.amount ? formatMoney(loc.amount, project.currency) : h('span', { class: 'muted' }, 'не распределён'))))))))
         : null,
       h('div', { class: 'form-section-title' }, 'Контактные лица иностранного партнёра'),
       project.contacts.length

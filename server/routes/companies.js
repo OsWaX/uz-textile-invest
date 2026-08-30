@@ -84,6 +84,26 @@ router.get('/api/companies/:id', async (ctx) => {
     company.id
   );
 
+  // Проекты, где компания выступает узбекской стороной (дополнение № 1 к ТЗ)
+  const partnerProjects = all(
+    `SELECT p.id, p.code, p.title, p.status_code, p.area, p.amount, p.currency,
+            pp.role_note, d.name_ru AS status_name, d.color AS status_color,
+            u.full_name AS responsible_name, co.name_ru AS country_name
+     FROM project_partners pp
+     JOIN projects p ON p.id = pp.project_id AND p.is_deleted = 0
+     LEFT JOIN dictionaries d ON d.kind = 'project_status' AND d.code = p.status_code
+     LEFT JOIN users u ON u.id = p.responsible_user_id
+     LEFT JOIN countries co ON co.id = p.country_id
+     WHERE pp.company_id = ? ORDER BY p.updated_at DESC`,
+    company.id
+  );
+
+  const partnerTotals = {};
+  for (const project of partnerProjects) {
+    if (!project.amount) continue;
+    partnerTotals[project.currency] = (partnerTotals[project.currency] || 0) + project.amount;
+  }
+
   const totals = {};
   for (const project of projects) {
     if (!project.amount) continue;
@@ -94,6 +114,10 @@ router.get('/api/companies/:id', async (ctx) => {
     ...company,
     contacts: all("SELECT * FROM contacts WHERE entity_type = 'company' AND entity_id = ? ORDER BY id", company.id),
     projects,
+    partner_projects: partnerProjects,
+    partner_totals: partnerTotals,
+    role: projects.length && partnerProjects.length ? 'both'
+      : partnerProjects.length ? 'local' : 'foreign',
     meetings,
     totals,
     attachments: entities.listAttachments('company', company.id, { allVersions: true }),
@@ -188,10 +212,18 @@ router.delete('/api/companies/:id', async (ctx) => {
   const company = loadCompany(ctx.params.id);
   // Целостность данных (раздел 11 ТЗ): нельзя удалить компанию со связанными проектами.
   const linked = get('SELECT COUNT(*) AS n FROM projects WHERE company_id = ? AND is_deleted = 0', company.id).n;
-  if (linked > 0) {
+  const asPartner = get(
+    `SELECT COUNT(*) AS n FROM project_partners pp JOIN projects p ON p.id = pp.project_id
+     WHERE pp.company_id = ? AND p.is_deleted = 0`,
+    company.id
+  ).n;
+  if (linked > 0 || asPartner > 0) {
+    const parts = [];
+    if (linked > 0) parts.push(`как иностранный партнёр — ${linked}`);
+    if (asPartner > 0) parts.push(`как местный партнёр — ${asPartner}`);
     throw conflict(
-      `Нельзя удалить компанию: с ней связано проектов — ${linked}. Сначала переназначьте или удалите эти записи.`,
-      { linked }
+      `Нельзя удалить компанию: с ней связано проектов (${parts.join(', ')}). Сначала переназначьте или удалите эти записи.`,
+      { linked, as_partner: asPartner }
     );
   }
   run("UPDATE companies SET is_deleted = 1, deleted_at = datetime('now'), deleted_by = ? WHERE id = ?", user.id, company.id);
@@ -210,6 +242,10 @@ router.post('/api/companies/:id/merge', async (ctx) => {
 
   transaction(() => {
     run('UPDATE projects SET company_id = ? WHERE company_id = ?', target.id, source.id);
+    // Переносим роль местного партнёра, не создавая дублей в одном проекте
+    run(`DELETE FROM project_partners WHERE company_id = ? AND project_id IN
+           (SELECT project_id FROM project_partners WHERE company_id = ?)`, source.id, target.id);
+    run('UPDATE project_partners SET company_id = ? WHERE company_id = ?', target.id, source.id);
     run('UPDATE meetings SET company_id = ? WHERE company_id = ?', target.id, source.id);
     run("UPDATE contacts SET entity_id = ? WHERE entity_type = 'company' AND entity_id = ?", target.id, source.id);
     run("UPDATE attachments SET entity_id = ? WHERE entity_type = 'company' AND entity_id = ?", target.id, source.id);

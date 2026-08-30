@@ -230,3 +230,71 @@ export function worldMap(regionData, { onSelect = null } = {}) {
 
   return root;
 }
+
+// --------------------------------------------------------------------------
+//  Схематическая карта Республики Узбекистан по 14 регионам.
+//  Контуры условные: карта служит навигацией, а не картографическим документом.
+// --------------------------------------------------------------------------
+const UZ_SHAPES = {
+  karakalpakstan:  { d: 'M40,40 L250,28 L268,120 L232,206 L150,236 L74,196 L34,120 Z', at: [148, 120], short: 'Каракалпакстан' },
+  khorezm:         { d: 'M212,208 L268,196 L292,238 L256,268 L214,250 Z', at: [252, 232], short: 'Хорезм' },
+  navoiy:          { d: 'M270,124 L430,110 L452,206 L360,244 L292,214 L272,166 Z', at: [362, 172], short: 'Навоий' },
+  bukhara:         { d: 'M258,270 L360,248 L392,316 L330,364 L266,330 Z', at: [324, 306], short: 'Бухара' },
+  samarkand:       { d: 'M396,250 L470,232 L494,290 L440,318 L396,300 Z', at: [444, 276], short: 'Самарканд' },
+  jizzakh:         { d: 'M456,178 L522,168 L540,226 L488,244 L452,214 Z', at: [496, 204], short: 'Джизак' },
+  syrdarya:        { d: 'M528,150 L578,142 L590,190 L544,204 L524,178 Z', at: [556, 172], short: 'Сырдарья' },
+  tashkent_region: { d: 'M556,84 L646,72 L668,132 L606,158 L556,132 Z', at: [608, 110], short: 'Ташкент. обл.' },
+  tashkent_city:   { d: 'M602,60 L640,54 L648,80 L612,88 Z', at: [626, 48], short: 'г. Ташкент' },
+  namangan:        { d: 'M660,102 L744,92 L760,140 L700,158 L662,136 Z', at: [710, 122], short: 'Наманган' },
+  fergana:         { d: 'M708,166 L780,156 L796,206 L740,222 L706,196 Z', at: [750, 188], short: 'Фергана' },
+  andijan:         { d: 'M766,116 L830,108 L844,152 L792,166 L766,142 Z', at: [800, 134], short: 'Андижан' },
+  kashkadarya:     { d: 'M398,326 L486,300 L512,368 L446,406 L392,376 Z', at: [452, 352], short: 'Кашкадарья' },
+  surkhandarya:    { d: 'M452,412 L522,378 L552,436 L500,470 L450,446 Z', at: [502, 424], short: 'Сурхандарья' },
+};
+
+export function uzbekistanMap(regionData, { onSelect = null } = {}) {
+  const byCode = new Map(regionData.map((item) => [item.key, item]));
+  const max = Math.max(1, ...regionData.map((item) => item.count));
+
+  const root = svg('svg', {
+    viewBox: '0 0 880 500', class: 'worldmap', preserveAspectRatio: 'xMidYMid meet',
+    role: 'img', 'aria-label': 'Схематическая карта регионов Республики Узбекистан',
+  });
+  root.append(svg('rect', { x: 0, y: 0, width: 880, height: 500, fill: 'var(--surface-2)', rx: 8 }));
+
+  for (const [code, shape] of Object.entries(UZ_SHAPES)) {
+    const data = byCode.get(code);
+    const count = data?.count || 0;
+    const intensity = count ? 0.24 + (count / max) * 0.76 : 0.1;
+    const fill = count
+      ? `color-mix(in srgb, var(--indigo) ${Math.round(intensity * 100)}%, var(--surface))`
+      : 'var(--surface-3)';
+    const onDark = intensity > 0.5;
+
+    const group = svg('g', {
+      class: 'region',
+      role: onSelect ? 'button' : undefined,
+      tabindex: onSelect ? 0 : undefined,
+      onclick: onSelect ? () => onSelect(code, data) : undefined,
+      onkeydown: onSelect
+        ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect(code, data); } }
+        : undefined,
+    });
+    group.append(svg('path', { d: shape.d, fill, stroke: 'var(--surface)' },
+      svg('title', {}, `${data?.label || shape.short}: ${count} ${count === 1 ? 'проект' : 'проектов'}`)));
+
+    const [x, y] = shape.at;
+    if (count) {
+      group.append(svg('text', {
+        x, y, 'text-anchor': 'middle', class: 'region-count',
+        fill: onDark ? '#fff' : 'var(--ink)', stroke: fill,
+      }, String(count)));
+    }
+    group.append(svg('text', {
+      x, y: y + (count ? 20 : 5), 'text-anchor': 'middle', class: 'region-label',
+      fill: onDark ? '#fff' : 'var(--ink)', stroke: fill,
+    }, shape.short));
+    root.append(group);
+  }
+  return root;
+}

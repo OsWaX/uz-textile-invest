@@ -4,7 +4,7 @@
 import { api } from '../api.js';
 import { store } from '../store.js';
 import { h, frag, formatMoney, formatNumber, formatDate, daysUntil, plural, statusTag, column } from '../ui.js';
-import { donutChart, legend, barList, dynamicsChart, worldMap } from '../charts.js';
+import { donutChart, legend, barList, dynamicsChart, worldMap, uzbekistanMap } from '../charts.js';
 
 export async function renderDashboard({ query, navigate }) {
   const scope = query.scope || (store.isAdmin ? 'all' : 'my_region');
@@ -44,7 +44,13 @@ export async function renderDashboard({ query, navigate }) {
     kpiCard('Предстоящих визитов', formatNumber(kpi.upcoming_visits), 'ближайшие поездки и приёмы'),
     kpiCard('Компаний-партнёров', formatNumber(kpi.companies_total), 'в справочнике'),
     kpiCard('Просроченных этапов', formatNumber(kpi.overdue_steps), kpi.overdue_steps ? 'требуют внимания' : 'просрочек нет',
-      kpi.overdue_steps ? 'danger' : 'ok')
+      kpi.overdue_steps ? 'danger' : 'ok'),
+    kpiCard('Регионов Узбекистана охвачено',
+      `${data.uz_summary.regions_covered} из ${data.uz_summary.regions_total}`,
+      data.uz_summary.without_location
+        ? `без указания площадки: ${data.uz_summary.without_location}`
+        : 'площадка указана во всех проектах',
+      data.uz_summary.without_location ? 'warn' : 'ok')
   );
 
   // --- Панель внимания ---
@@ -122,6 +128,38 @@ export async function renderDashboard({ query, navigate }) {
         'Схематическая карта регионов ответственности проектных менеджеров. Насыщенность цвета отражает число проектов.')
     )
   );
+
+  const uz = data.uz_summary;
+  const uzCard = h('div', { class: 'card' },
+    h('div', { class: 'card-head' },
+      h('h2', {}, 'Реализация в Узбекистане'),
+      h('span', { class: 'muted small' }, `инвестиционных проектов: ${uz.investment_total}`)),
+    h('div', { class: 'card-body' },
+      data.by_uz_region.length
+        ? frag(
+            uzbekistanMap(data.by_uz_region, { onSelect: (code) => navigate('/projects', { uz_region: code }) }),
+            h('div', { class: 'mt-2' },
+              barList(data.by_uz_region, { onSelect: (item) => navigate('/projects', { uz_region: item.key }) })),
+            h('p', { class: 'small muted mt-1 mb-0' },
+              'Проект, реализуемый в нескольких регионах, учитывается в каждом из них — ' +
+              'поэтому сумма по регионам может превышать число проектов. Контуры областей условные.'))
+        : h('p', { class: 'muted' }, 'Ни у одного инвестиционного проекта не указан регион реализации.'),
+      uz.without_location
+        ? h('a', {
+            class: 'attention-item', href: '#', style: { color: 'inherit', textDecoration: 'none' },
+            onclick: (event) => { event.preventDefault(); navigate('/projects', { no_uz_region: '1' }); },
+          },
+            h('span', { class: 'marker', style: { background: 'var(--warn)' } }),
+            h('span', { style: { flex: '1' } },
+              h('div', { class: 'a-title' }, 'Регион реализации не указан'),
+              h('div', { class: 'a-meta' }, 'инвестиционные проекты без площадки — нажмите, чтобы открыть список')),
+            h('span', { class: 'a-right muted' }, formatNumber(uz.without_location)))
+        : null,
+      uz.unallocated_usd
+        ? h('p', { class: 'small muted mb-0 mt-1' },
+            `Не распределено по регионам: ${formatMoney(uz.unallocated_usd, 'USD', { compact: true })}. ` +
+            'Объём распределяется, когда в карточке проекта заполнено поле «Объём в регионе».')
+        : null));
 
   const listsRow = h('div', { class: 'grid grid-3' },
     h('div', { class: 'card' },
@@ -206,7 +244,7 @@ export async function renderDashboard({ query, navigate }) {
     scopeChips,
     kpiCards,
     h('div', { class: 'split mt-2' },
-      column(chartsRow, mapCard, dynamicsCard, visitsCard),
+      column(chartsRow, mapCard, uzCard, dynamicsCard, visitsCard),
       column(attentionCard)
     )
   );

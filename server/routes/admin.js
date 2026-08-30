@@ -7,6 +7,7 @@ const auth = require('../auth');
 const audit = require('../audit');
 const cf = require('../customfields');
 const config = require('../config');
+const { DEFAULT_SETTINGS } = require('../reference');
 const v = require('../lib/validate');
 
 const router = new Router();
@@ -149,6 +150,7 @@ router.get('/api/admin/dictionaries', async (ctx) => {
   const result = {};
   for (const kind of DICT_KINDS) result[kind] = all('SELECT * FROM dictionaries WHERE kind = ? ORDER BY sort, id', kind);
   result.regions = all('SELECT * FROM regions ORDER BY sort');
+  result.uz_regions = all('SELECT * FROM uz_regions ORDER BY sort, id');
   result.countries = all(
     'SELECT c.*, r.name_ru AS region_name FROM countries c JOIN regions r ON r.id = c.region_id ORDER BY c.name_ru'
   );
@@ -217,6 +219,36 @@ function countUsage(item) {
   const sql = map[item.kind];
   return sql ? get(sql, item.code)?.n ?? 0 : 0;
 }
+
+/** Правка справочника регионов Узбекистана (дополнение № 1 к ТЗ). */
+router.patch('/api/admin/uz-regions/:id', async (ctx) => {
+  const admin = requireAdmin(ctx, 'admin.dictionaries');
+  const region = get('SELECT * FROM uz_regions WHERE id = ?', Number(ctx.params.id));
+  if (!region) throw notFound('Регион не найден');
+
+  const updates = {};
+  if (ctx.body.name_ru !== undefined) updates.name_ru = v.str(ctx.body.name_ru, 'Название (рус.)', { required: true, max: 200 });
+  if (ctx.body.name_uz !== undefined) updates.name_uz = v.str(ctx.body.name_uz, 'Название (узб.)', { max: 200 });
+  if (ctx.body.name_en !== undefined) updates.name_en = v.str(ctx.body.name_en, 'Название (англ.)', { max: 200 });
+  if (ctx.body.sort !== undefined) updates.sort = v.int(ctx.body.sort, 'Порядок', { min: 0 });
+  if (ctx.body.is_active !== undefined) {
+    updates.is_active = v.bool(ctx.body.is_active) ? 1 : 0;
+    if (!updates.is_active) {
+      const inUse = get('SELECT COUNT(*) AS n FROM project_locations WHERE uz_region_id = ?', region.id).n;
+      if (inUse) throw conflict(`Регион указан в ${inUse} проектах и не может быть отключён`);
+    }
+  }
+  if (!Object.keys(updates).length) throw badRequest('Нет данных для изменения');
+
+  const assignments = Object.keys(updates).map((key) => `${key} = ?`).join(', ');
+  run(`UPDATE uz_regions SET ${assignments} WHERE id = ?`, ...Object.values(updates), region.id);
+  audit.record({
+    user: admin, action: 'settings', entityType: 'dictionary', entityId: region.id,
+    summary: `Изменён регион Узбекистана «${region.name_ru}»`,
+    changes: audit.diff(Object.fromEntries(Object.keys(updates).map((k) => [k, region[k]])), updates), req: ctx.req,
+  });
+  return get('SELECT * FROM uz_regions WHERE id = ?', region.id);
+});
 
 /** Изменение привязки страны к региону (п. 9.2 ТЗ). */
 router.patch('/api/admin/countries/:id', async (ctx) => {
@@ -336,12 +368,15 @@ const EDITABLE_SETTINGS = {
   'currency.rates_to_usd': 'Курсы валют к доллару США',
   'org.name': 'Название организации',
   'org.ministry': 'Министерство',
+  'projects.locations_for_export': 'Указывать регионы реализации и для экспортных проектов',
 };
 
 router.get('/api/admin/settings', async (ctx) => {
   requireAdmin(ctx, 'admin.settings');
+  // Если строки в базе нет, отдаём значение по умолчанию, а не null:
+  // иначе форма покажет нули и сохранит их поверх рабочих настроек.
   const values = {};
-  for (const key of Object.keys(EDITABLE_SETTINGS)) values[key] = getSetting(key, null);
+  for (const key of Object.keys(EDITABLE_SETTINGS)) values[key] = getSetting(key, DEFAULT_SETTINGS[key] ?? null);
   return {
     labels: EDITABLE_SETTINGS,
     values,

@@ -98,6 +98,10 @@ export async function renderCompany({ params, navigate }) {
         h('div', { class: 'titles' },
           h('h1', {}, company.name),
           h('div', { class: 'subtitle' },
+            company.role === 'local' ? h('span', { class: 'tag tag-ok' }, 'Местный партнёр')
+              : company.role === 'both' ? h('span', { class: 'tag tag-indigo' }, 'Иностранный и местный партнёр')
+              : null,
+            company.role !== 'foreign' ? ' · ' : '',
             `${company.country_name || '—'}${company.city ? `, ${company.city}` : ''}`,
             company.industry ? ` · ${company.industry}` : '',
             company.region_name ? ` · ${company.region_name}` : ''
@@ -133,7 +137,7 @@ export async function renderCompany({ params, navigate }) {
           : '—')
       ),
       h('div', { class: 'split' },
-        column(projectsCard(company), meetingsCard(company), commentsCard(company, reload)),
+        column(projectsCard(company), partnerProjectsCard(company), meetingsCard(company), commentsCard(company, reload)),
         column(profileCard(company), contactsCard(company), filesCard(company, reload))
       )
     );
@@ -214,6 +218,35 @@ function projectsCard(company) {
         )
       : h('div', { class: 'card-body' }, h('p', { class: 'muted mb-0' }, 'Проектов с этой компанией пока нет.'))
   );
+}
+
+/** Проекты, где компания выступает узбекской стороной (дополнение № 1 к ТЗ). */
+function partnerProjectsCard(company) {
+  const rows = company.partner_projects || [];
+  if (!rows.length) return null;
+
+  const totals = Object.entries(company.partner_totals || {});
+  const totalsLabel = totals.map(([currency, sum]) => formatMoney(sum, currency, { compact: true })).join(' · ');
+
+  const row = (project) => h('tr', {},
+    h('td', { class: 'code' }, project.code),
+    h('td', {}, h('a', { href: `#/projects/${project.id}` }, project.title)),
+    h('td', {}, project.role_note || h('span', { class: 'muted' }, '—')),
+    h('td', {}, statusTag(project.status_name, project.status_color)),
+    h('td', { class: 'num' }, formatMoney(project.amount, project.currency, { compact: true })));
+
+  const table = h('div', { class: 'table-wrap' },
+    h('table', { class: 'data' },
+      h('thead', {}, h('tr', {},
+        h('th', {}, 'Код'), h('th', {}, 'Название'), h('th', {}, 'Роль в проекте'),
+        h('th', {}, 'Статус'), h('th', { class: 'num' }, 'Сумма'))),
+      h('tbody', {}, rows.map(row))));
+
+  return h('div', { class: 'card' },
+    h('div', { class: 'card-head' },
+      h('h2', {}, `Проекты, где компания — местный партнёр — ${rows.length}`),
+      totalsLabel ? h('span', { class: 'muted small' }, totalsLabel) : null),
+    h('div', { class: 'card-body tight' }, table));
 }
 
 function meetingsCard(company) {

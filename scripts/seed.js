@@ -14,6 +14,7 @@ const DEMO_PASSWORD = 'Parol2026!';
 const reset = process.argv.includes('--reset');
 
 const TABLES = [
+  'project_locations', 'project_partners',
   'poll_votes', 'custom_values', 'custom_fields', 'correction_requests',
   'notification_deliveries', 'notifications', 'audit_log', 'saved_filters',
   'comments', 'attachments', 'contacts', 'meetings', 'visit_members', 'visits',
@@ -117,6 +118,22 @@ const COMPANIES = [
   { key: 'cairotex', name: 'Cairo Textile Trading', iso2: 'EG', city: 'Каир', industry: 'Оптовая торговля', owner: 'africa',
     profile: 'Египетский оптовик. Реэкспорт в страны Северной Африки.',
     contacts: [{ full_name: 'Мохамед Хассан', position: 'Владелец', phone: '+20 2 5555-4040', email: 'm.hassan@cairotex.example' }] },
+  // Узбекские организации — местные партнёры проектов (дополнение № 1 к ТЗ)
+  { key: 'namangantex', name: 'ООО «Наманган Тўқимачилик»', iso2: 'UZ', city: 'Наманган', industry: 'Прядильное производство', owner: 'europe',
+    profile: 'Прядильное предприятие Наманганской области. Рассматривается как площадка совместного производства.',
+    contacts: [{ full_name: 'Юлдашев Икром Собирович', position: 'Директор', phone: '+998 69 227-14-50', email: 'i.yuldashev@namangantex.example' }] },
+  { key: 'andijansewing', name: 'АО «Андижон Тикув»', iso2: 'UZ', city: 'Андижан', industry: 'Швейное производство', owner: 'me',
+    profile: 'Швейное объединение Андижанской области. Действующие мощности — 400 рабочих мест.',
+    contacts: [{ full_name: 'Тошматов Улугбек Рахимович', position: 'Председатель правления', phone: '+998 74 223-40-11', email: 'u.toshmatov@andijansewing.example' }] },
+  { key: 'margilonsilk', name: 'Маргиланский шёлковый комбинат', iso2: 'UZ', city: 'Маргилан', industry: 'Переработка шёлка', owner: 'eastasia',
+    profile: 'Крупнейшее предприятие по переработке шёлка-сырца в Ферганской долине.',
+    contacts: [{ full_name: 'Абдуллаев Шухрат Каримович', position: 'Генеральный директор', phone: '+998 73 233-55-20', email: 'sh.abdullaev@margilonsilk.example' }] },
+  { key: 'uzbektextile', name: 'АО «Узбектекстиль»', iso2: 'UZ', city: 'Ташкент', industry: 'Отраслевое объединение', owner: 'admin',
+    profile: 'Отраслевое объединение предприятий текстильной промышленности.',
+    contacts: [{ full_name: 'Шодиев Фаррух Абдуллаевич', position: 'Заместитель председателя правления', phone: '+998 71 202-10-30', email: 'f.shodiev@uzbektextile.example' }] },
+  { key: 'bukharacotton', name: 'ООО «Бухоро Пахта Синтез»', iso2: 'UZ', city: 'Бухара', industry: 'Переработка хлопкового волокна', owner: 'southasia',
+    profile: 'Предприятие по глубокой переработке хлопкового волокна.',
+    contacts: [{ full_name: 'Нарзуллаев Азиз Бахтиёрович', position: 'Директор', phone: '+998 65 221-70-40', email: 'a.narzullaev@bukharacotton.example' }] },
   { key: 'capeleather', name: 'Cape Leather Works (Pty) Ltd', iso2: 'ZA', city: 'Кейптаун', industry: 'Кожевенное производство', owner: 'africa',
     profile: 'Южноафриканский производитель кожгалантереи. Закупает выделанную кожу.',
     contacts: [{ full_name: 'Питер ван дер Мерве', position: 'Генеральный директор', phone: '+27 21 555-5050', email: 'p.vdmerwe@capeleather.example' }] },
@@ -171,6 +188,8 @@ const PROJECTS = [
       { title: 'Подписание экспортного контракта', due: 40, state: 'planned' },
     ] },
   { company: 'anadolu', owner: 'europe', type: 'project', sector: 'textile', area: 'investment', status: 'negotiation',
+    partners: [['namangantex', 'учредитель совместного предприятия'], ['uzbektextile', 'отраслевое сопровождение']],
+    locations: [['namangan', 'г. Наманган', 20_000_000], ['fergana', 'Кувинский район', 8_000_000]],
     title: 'Совместное прядильное производство в Наманганской области', amount: 28_000_000, currency: 'USD',
     description: 'Инвестиционный проект: прядильная фабрика мощностью 12 000 тонн пряжи в год, около 600 рабочих мест.',
     contacts: [{ full_name: 'Мехмет Йылмаз', position: 'Член правления', phone: '+90 224 555-70-10', email: 'm.yilmaz@anadolu-tekstil.example' }],
@@ -207,6 +226,8 @@ const PROJECTS = [
       { title: 'Расширение ассортимента до 40 позиций', due: 25, state: 'planned' },
     ] },
   { company: 'riyadhknit', owner: 'me', type: 'project', sector: 'textile', area: 'investment', status: 'negotiation',
+    partners: [['andijansewing', 'производственная площадка']],
+    locations: [['andijan', 'г. Асака', 15_500_000]],
     title: 'Швейное производство в Андижанской области', amount: 15_500_000, currency: 'USD',
     description: 'Инвестиционный проект по созданию швейного предприятия полного цикла на 900 рабочих мест.',
     contacts: [{ full_name: 'Халид Аль-Отайби', position: 'Управляющий партнёр', phone: '+966 11 555-44-33', email: 'k.alotaibi@riyadhknit.example' }],
@@ -216,6 +237,8 @@ const PROJECTS = [
       { title: 'Визит инвестора на площадку', due: 33, state: 'planned' },
     ] },
   { company: 'delhicotton', owner: 'southasia', type: 'mou', sector: 'textile', area: 'investment', status: 'mou_signed',
+    partners: [['bukharacotton', 'учредитель совместного предприятия']],
+    locations: [['bukhara', 'Каганский район', null], ['kashkadarya', 'г. Карши', null]],
     title: 'Совместное предприятие по глубокой переработке хлопка', amount: 9_800_000, currency: 'USD',
     description: 'Меморандум о создании СП по переработке хлопкового волокна с индийским партнёром.',
     contacts: [{ full_name: 'Раджеш Шарма', position: 'Исполнительный директор', phone: '+91 11 5555-2020', email: 'r.sharma@delhicotton.example' }],
@@ -225,6 +248,7 @@ const PROJECTS = [
       { title: 'Регистрация совместного предприятия', due: 60, state: 'planned' },
     ] },
   { company: 'shandong', owner: 'eastasia', type: 'contract', sector: 'silk', area: 'export', status: 'implementation',
+    partners: [['margilonsilk', 'поставщик шёлка-сырца']],
     title: 'Экспорт шёлка-сырца в Китайскую Народную Республику', amount: 12_600_000, currency: 'USD',
     description: 'Крупнейший экспортный контракт по шёлку. Поставки коконов и шёлка-сырца.',
     contacts: [{ full_name: 'Ли Вэй', position: 'Заместитель генерального директора', phone: '+86 531 5555-6060', email: 'li.wei@shandong-silk.example' }],
@@ -316,6 +340,20 @@ transaction(() => {
       projectId, project.status, 'Создание записи', ownerId, created
     );
 
+    for (const [partnerKey, roleNote] of project.partners || []) {
+      const partnerId = companies[partnerKey];
+      if (!partnerId) continue;
+      run('INSERT INTO project_partners (project_id, company_id, role_note) VALUES (?, ?, ?)',
+        projectId, partnerId, roleNote || '');
+    }
+
+    for (const [regionCode, locality, regionAmount] of project.locations || []) {
+      const region = get('SELECT id FROM uz_regions WHERE code = ?', regionCode);
+      if (!region) continue;
+      run('INSERT INTO project_locations (project_id, uz_region_id, locality, amount) VALUES (?, ?, ?, ?)',
+        projectId, region.id, locality, regionAmount);
+    }
+
     project.steps.forEach((step, index) => {
       const doneAt = step.state === 'done'
         ? new Date(Date.now() + (step.due - 1) * 86400000).toISOString().slice(0, 19).replace('T', ' ')
@@ -337,7 +375,7 @@ const VISITS = [
   { owner: 'europe', direction: 'outbound', iso2: 'DE', cities: 'Гамбург, Дюссельдорф', from: 14, to: 18, status: 'confirmed',
     goal: 'Участие в выставке Heimtextil и переговоры с действующими и потенциальными покупателями домашнего текстиля.',
     members: [
-      { key: 'admin', organization: 'Министерство инвестиций, промышленности и торговли', position: 'Руководитель делегации' },
+      { key: 'admin', organization: 'Агентство по развитию легкой промышленности', position: 'Руководитель делегации' },
       { key: 'europe', organization: 'Проектный офис', position: 'Проектный менеджер' },
       { name: 'Шодиев Фаррух Абдуллаевич', organization: 'АО «Узбектекстиль»', position: 'Заместитель председателя правления' },
     ],
@@ -499,6 +537,8 @@ const counts = {
   'Этапы дорожных карт': all('SELECT id FROM roadmap_steps').length,
   Визиты: all('SELECT id FROM visits').length,
   Встречи: all('SELECT id FROM meetings').length,
+  'Местные партнёры': all('SELECT id FROM project_partners').length,
+  'Площадки в Узбекистане': all('SELECT id FROM project_locations').length,
 };
 
 console.log('\nДемонстрационные данные созданы:');
