@@ -13,6 +13,7 @@
     "dev": "node --no-warnings=ExperimentalWarning --watch server/index.js",
     "seed": "node --no-warnings=ExperimentalWarning scripts/seed.js",
     "reset": "node --no-warnings=ExperimentalWarning scripts/seed.js --reset",
+    "clean": "node --no-warnings=ExperimentalWarning scripts/clean.js",
     "test": "node --no-warnings=ExperimentalWarning --test tests/*.test.js"
   },
   "dependencies": {},
