@@ -1,0 +1,34 @@
+{
+  "name": "Портал Проектного офиса",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
+
+  "containerEnv": {
+    "TZ": "Asia/Tashkent",
+    "PORT": "3000"
+  },
+
+  // Внешних зависимостей нет — только создаём базу с демонстрационными данными.
+  "postCreateCommand": "node --version && npm run seed",
+
+  // Портал запускается сам при открытии среды разработки.
+  "postAttachCommand": {
+    "Портал": "npm start"
+  },
+
+  "forwardPorts": [3000],
+  "portsAttributes": {
+    "3000": {
+      "label": "Портал Проектного офиса",
+      "onAutoForward": "openBrowser"
+    }
+  },
+
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "files.eol": "\n",
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
+    }
+  }
+}

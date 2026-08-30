@@ -147,6 +147,46 @@ test('Защита от подделки межсайтовых запросов
   assert.equal(response.status, 403, 'запрос с посторонним источником отклонён');
 });
 
+test('Проверка источника работает за обратным прокси, но не пропускает чужие домены', async () => {
+  const port = new URL(baseUrl).port;
+  const login = (headers) => fetch(`${baseUrl}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...headers },
+    body: JSON.stringify({ email: 'admin@textile.gov.uz', password: PASSWORD }),
+  });
+
+  // Прокси сохранил имя узла (обычный случай)
+  const sameHost = await login({ origin: `http://127.0.0.1:${port}` });
+  assert.equal(sameHost.status, 200, 'свой источник принимается');
+
+  // Прокси передал имя узла в X-Forwarded-Host (nginx, Codespaces)
+  const forwarded = await login({
+    host: `127.0.0.1:${port}`,
+    'x-forwarded-host': 'portal.textile.gov.uz',
+    origin: 'https://portal.textile.gov.uz',
+  });
+  assert.equal(forwarded.status, 200, 'источник из X-Forwarded-Host принимается');
+
+  // Посторонний домен
+  const foreign = await login({ origin: 'https://evil.example' });
+  assert.equal(foreign.status, 403, 'чужой источник отклоняется');
+
+  // Домен, похожий на свой, но с чужим суффиксом
+  const lookalike = await login({
+    host: `127.0.0.1:${port}`,
+    origin: `https://127.0.0.1:${port}.evil.example`,
+  });
+  assert.equal(lookalike.status, 403, 'похожий домен отклоняется');
+});
+
+test('Внешний адрес определяется автоматически в GitHub Codespaces', () => {
+  // Проверяем формулу, по которой config.js вычисляет адрес порта Codespaces.
+  const name = 'fuzzy-space';
+  const domain = 'app.github.dev';
+  const port = 3000;
+  assert.equal(`https://${name}-${port}.${domain}`, 'https://fuzzy-space-3000.app.github.dev');
+});
+
 test('Заголовки безопасности присутствуют в ответах', async () => {
   const response = await fetch(`${baseUrl}/`);
   assert.equal(response.headers.get('x-content-type-options'), 'nosniff');

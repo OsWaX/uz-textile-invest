@@ -113,6 +113,22 @@ const SECURITY_HEADERS = {
   ].join('; '),
 };
 
+/**
+ * Источник считается своим, если он совпадает с внешним адресом системы либо
+ * с именем узла из заголовков запроса. Учитываются заголовки обратного прокси,
+ * поэтому проверка работает и за прокси (nginx, GitHub Codespaces).
+ */
+function isTrustedOrigin(origin, req) {
+  const normalized = origin.replace(/\/+$/, '');
+  if (config.trustedOrigins.includes(normalized)) return true;
+
+  const hosts = [req.headers.host, req.headers['x-forwarded-host']]
+    .filter(Boolean)
+    .flatMap((value) => String(value).split(',').map((part) => part.trim()));
+
+  return hosts.some((host) => normalized === `http://${host}` || normalized === `https://${host}`);
+}
+
 // --------------------------------------------------------------------------
 // Обработчик запросов
 // --------------------------------------------------------------------------
@@ -126,15 +142,13 @@ async function handle(req, res) {
 
   if (!pathname.startsWith('/api/')) { serveStatic(req, res, pathname); return; }
 
-  // Защита от CSRF: небезопасные методы принимаются только с совпадающим Origin.
+  // Защита от CSRF: небезопасные методы принимаются только со своего источника.
+  // Основной барьер — cookie с атрибутом SameSite=Lax; проверка ниже дополняет его.
   if (!['GET', 'HEAD'].includes(req.method)) {
     const origin = req.headers.origin;
-    if (origin) {
-      const allowed = [config.publicUrl, `http://${req.headers.host}`, `https://${req.headers.host}`];
-      if (!allowed.includes(origin.replace(/\/+$/, ''))) {
-        sendJson(res, 403, { error: 'Запрос отклонён: несовпадение источника (защита от CSRF)' });
-        return;
-      }
+    if (origin && !isTrustedOrigin(origin, req)) {
+      sendJson(res, 403, { error: 'Запрос отклонён: несовпадение источника (защита от CSRF)' });
+      return;
     }
   }
 

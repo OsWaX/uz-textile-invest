@@ -5,6 +5,18 @@
  */
 const fs = require('node:fs');
 const path = require('node:path');
+
+// Встроенный модуль node:sqlite доступен начиная с Node.js 22.5.
+const [major, minor] = process.versions.node.split('.').map(Number);
+if (major < 22 || (major === 22 && minor < 5)) {
+  console.error(
+    `\n  Требуется Node.js версии 22.5 или новее — установлена ${process.versions.node}.\n` +
+    '  Обновите Node.js (https://nodejs.org) либо запустите систему через Docker:\n' +
+    '     docker compose up -d\n'
+  );
+  process.exit(1);
+}
+
 const { DatabaseSync } = require('node:sqlite');
 const config = require('./config');
 

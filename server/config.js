@@ -49,12 +49,33 @@ if (!sessionSecret || sessionSecret.length < 32) {
   }
 }
 
+const port = num(env.PORT, 3000);
+
+/**
+ * В средах с обратным проксированием (GitHub Codespaces и подобные) внешний
+ * адрес отличается от локального. Определяем его автоматически, чтобы работали
+ * ссылки в уведомлениях и проверка источника запроса.
+ */
+function detectPublicUrl() {
+  if (env.PUBLIC_URL) return env.PUBLIC_URL;
+  if (env.CODESPACE_NAME && env.GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN) {
+    return `https://${env.CODESPACE_NAME}-${port}.${env.GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}`;
+  }
+  return `http://localhost:${port}`;
+}
+
+const trustedOrigins = [
+  detectPublicUrl(),
+  ...(env.TRUSTED_ORIGINS || '').split(',').map((value) => value.trim()).filter(Boolean),
+].map((value) => value.replace(/\/+$/, ''));
+
 const config = {
   root: ROOT,
   isProduction,
-  port: num(env.PORT, 3000),
+  port,
   host: env.HOST || '0.0.0.0',
-  publicUrl: (env.PUBLIC_URL || `http://localhost:${num(env.PORT, 3000)}`).replace(/\/+$/, ''),
+  publicUrl: detectPublicUrl().replace(/\/+$/, ''),
+  trustedOrigins,
 
   sessionSecret,
   secureCookies: bool(env.SECURE_COOKIES, isProduction),
