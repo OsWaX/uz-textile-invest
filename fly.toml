@@ -1,0 +1,57 @@
+# =============================================================================
+#  Развёртывание портала Проектного офиса на Fly.io.
+#
+#  Порядок:
+#    fly launch --no-deploy --copy-config
+#    fly volumes create portal_data --size 10 --region fra
+#    fly secrets set SESSION_SECRET=$(node -e "console.log(require('crypto').randomBytes(48).toString('hex'))")
+#    fly secrets set ADMIN_PASSWORD='<пароль администратора>'
+#    fly secrets set PUBLIC_URL='https://<имя-приложения>.fly.dev'
+#    fly deploy
+#
+#  Внимание: у Fly.io нет площадок в Узбекистане. Раздел 11 ТЗ требует
+#  размещения базы данных на территории республики — этот вариант пригоден
+#  для демонстрации, промышленная установка описана в docs/deployment.md.
+# =============================================================================
+app = "uz-textile-portal"
+primary_region = "fra"        # Франкфурт; ближе к Ташкенту также "bom" и "sin"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  TZ = "Asia/Tashkent"
+  PORT = "3000"
+  HOST = "0.0.0.0"
+  SECURE_COOKIES = "1"
+  DB_PATH = "/app/data/portal.db"
+  UPLOAD_DIR = "/app/data/uploads"
+  ADMIN_EMAIL = "admin@textile.gov.uz"
+
+# Постоянный том: без него база и загруженные документы теряются
+# при каждом развёртывании.
+[[mounts]]
+  source = "portal_data"
+  destination = "/app/data"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  # База SQLite не допускает запись из нескольких процессов, поэтому
+  # экземпляр должен быть ровно один и он не должен останавливаться:
+  # планировщик напоминаний работает в том же процессе.
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "15s"
+    method = "GET"
+    path = "/"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

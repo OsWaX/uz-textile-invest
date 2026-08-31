@@ -1,0 +1,55 @@
+# =============================================================================
+#  Развёртывание портала Проектного офиса на Render (render.com).
+#
+#  Площадка запускает контейнер из Dockerfile и подключает постоянный диск —
+#  без него база SQLite и загруженные документы теряются при перезапуске.
+#
+#  Порядок: Render → New → Blueprint → выбрать этот репозиторий.
+#  После создания задайте ADMIN_PASSWORD и PUBLIC_URL в настройках службы.
+#
+#  Внимание: серверы Render находятся за пределами Узбекистана. Раздел 11 ТЗ
+#  требует размещения базы данных на территории республики, поэтому такой
+#  вариант подходит для демонстрации и опытной эксплуатации, но не для
+#  промышленной. Промышленная установка описана в docs/deployment.md.
+# =============================================================================
+services:
+  - type: web
+    name: uz-textile-portal
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    # Постоянный диск доступен начиная с платного плана.
+    plan: starter
+    region: frankfurt
+    healthCheckPath: /
+    # Одновременно должен работать ровно один экземпляр: файл базы SQLite
+    # не рассчитан на запись из нескольких процессов.
+    numInstances: 1
+    disk:
+      name: portal-data
+      mountPath: /app/data
+      sizeGB: 10
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TZ
+        value: Asia/Tashkent
+      - key: HOST
+        value: 0.0.0.0
+      - key: DB_PATH
+        value: /app/data/portal.db
+      - key: UPLOAD_DIR
+        value: /app/data/uploads
+      # Приложение работает за HTTPS-прокси площадки.
+      - key: SECURE_COOKIES
+        value: "1"
+      # Ключ подписи сессий формируется площадкой и не попадает в репозиторий.
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: ADMIN_EMAIL
+        value: admin@textile.gov.uz
+      # Задайте вручную в панели Render перед первым запуском.
+      - key: ADMIN_PASSWORD
+        sync: false
+      # Внешний адрес: https://<имя-службы>.onrender.com
+      - key: PUBLIC_URL
+        sync: false
