@@ -83,7 +83,8 @@ const config = {
   loginMaxAttempts: num(env.LOGIN_MAX_ATTEMPTS, 5),
   loginLockMinutes: num(env.LOGIN_LOCK_MINUTES, 15),
 
-  dbPath: path.resolve(ROOT, env.DB_PATH || './data/portal.db'),
+  databaseUrl: env.DATABASE_URL || 'postgres://portal:portal@127.0.0.1:5432/uz_textile_portal',
+  dbPoolSize: num(env.DB_POOL_SIZE, 10),
   uploadDir: path.resolve(ROOT, env.UPLOAD_DIR || './data/uploads'),
   maxUploadBytes: num(env.MAX_UPLOAD_MB, 25) * 1024 * 1024,
 

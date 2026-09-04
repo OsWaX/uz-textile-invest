@@ -12,7 +12,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 
 const config = require('./config');
-const { get, run } = require('./db');
+const { get, run, init, getSetting } = require('./db');
 const reference = require('./reference');
 const auth = require('./auth');
 const notify = require('./notify');
@@ -167,7 +167,7 @@ async function handle(req, res) {
   const ctx = {
     req, res, params: matched.params, query,
     body: ['POST', 'PUT', 'PATCH'].includes(req.method) && !isMultipart ? await readJson(req) : {},
-    user: auth.currentUser(req),
+    user: await auth.currentUser(req),
     requireUser() {
       if (!this.user) throw unauthorized('Сессия истекла или отсутствует. Войдите в систему заново.');
       return this.user;
@@ -196,14 +196,15 @@ const server = http.createServer((req, res) => {
 // --------------------------------------------------------------------------
 // Первичная инициализация
 // --------------------------------------------------------------------------
-function bootstrap() {
-  reference.ensureReference();
+async function bootstrap() {
+  await init();
+  await reference.ensureReference();
 
-  const hasAdmin = get("SELECT id FROM users WHERE role = 'admin' LIMIT 1");
+  const hasAdmin = await get("SELECT id FROM users WHERE role = 'admin' LIMIT 1");
   if (!hasAdmin) {
     const password = config.bootstrapAdmin.password || crypto.randomBytes(9).toString('base64url');
     const { salt, hash } = auth.hashPassword(password);
-    run(
+    await run(
       `INSERT INTO users (email, full_name, position, role, password_hash, password_salt, must_change_pwd)
        VALUES (?, ?, ?, 'admin', ?, ?, 1)`,
       config.bootstrapAdmin.email, 'Администратор системы',
@@ -216,23 +217,28 @@ function bootstrap() {
   }
 
   // Очистка корзины по истечении срока хранения.
-  const retention = Number(require('./db').getSetting('recycle_bin.retention_days', 30));
+  const retention = Number(await getSetting('recycle_bin.retention_days', 30));
   for (const table of ['projects', 'companies', 'visits', 'meetings', 'roadmap_steps']) {
-    run(`DELETE FROM ${table} WHERE is_deleted = 1 AND deleted_at < datetime('now', '-${retention} day')`);
+    await run(`DELETE FROM ${table} WHERE is_deleted = 1 AND deleted_at < datetime('now', '-${retention} day')`);
   }
-  run("DELETE FROM sessions WHERE last_seen_at < datetime('now', '-30 day')");
+  await run("DELETE FROM sessions WHERE last_seen_at < datetime('now', '-30 day')");
 }
 
-function start() {
-  bootstrap();
+async function start() {
+  await bootstrap();
   notify.startScheduler();
   server.listen(config.port, config.host, () => {
     console.log(`  Портал Проектного офиса запущен: http://${config.host}:${config.port}`);
-    console.log(`  Режим: ${config.isProduction ? 'продакшен' : 'разработка'} | БД: ${config.dbPath}`);
+    console.log(`  Режим: ${config.isProduction ? 'продакшен' : 'разработка'} | БД: PostgreSQL`);
     console.log(`  Почта: ${config.smtp.enabled ? config.smtp.host : 'не настроена'} | Telegram: ${config.telegram.enabled ? 'подключён' : 'не настроен'}`);
   });
 }
 
-if (require.main === module) start();
+if (require.main === module) {
+  start().catch((error) => {
+    console.error('[старт] ошибка:', error);
+    process.exit(1);
+  });
+}
 
 module.exports = { server, start, bootstrap, handle };

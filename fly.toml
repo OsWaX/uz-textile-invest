@@ -7,6 +7,7 @@
 #    fly secrets set SESSION_SECRET=$(node -e "console.log(require('crypto').randomBytes(48).toString('hex'))")
 #    fly secrets set ADMIN_PASSWORD='<пароль администратора>'
 #    fly secrets set PUBLIC_URL='https://<имя-приложения>.fly.dev'
+#    fly secrets set DATABASE_URL='postgres://USER:PASSWORD@HOST:5432/DBNAME'
 #    fly deploy
 #
 #  Внимание: у Fly.io нет площадок в Узбекистане. Раздел 11 ТЗ требует
@@ -25,22 +26,20 @@ primary_region = "fra"        # Франкфурт; ближе к Ташкент
   PORT = "3000"
   HOST = "0.0.0.0"
   SECURE_COOKIES = "1"
-  DB_PATH = "/app/data/portal.db"
   UPLOAD_DIR = "/app/data/uploads"
   ADMIN_EMAIL = "admin@textile.gov.uz"
 
-# Постоянный том: без него база и загруженные документы теряются
+# Постоянный том: без него загруженные документы теряются
 # при каждом развёртывании.
 [[mounts]]
-  source = "portal_data"
-  destination = "/app/data"
+  source = "portal_uploads"
+  destination = "/app/data/uploads"
 
 [http_service]
   internal_port = 3000
   force_https = true
-  # База SQLite не допускает запись из нескольких процессов, поэтому
-  # экземпляр должен быть ровно один и он не должен останавливаться:
-  # планировщик напоминаний работает в том же процессе.
+  # Планировщик напоминаний работает в том же процессе, поэтому экземпляр
+  # должен быть один и он не должен останавливаться.
   auto_stop_machines = false
   auto_start_machines = true
   min_machines_running = 1

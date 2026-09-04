@@ -81,10 +81,10 @@ const DEFAULT_SETTINGS = {
   'projects.locations_for_export': false,
 };
 
-function ensureReference() {
-  transaction(() => {
+async function ensureReference() {
+  await transaction(async () => {
     for (const region of REGIONS) {
-      run(
+      await run(
         `INSERT INTO regions (code, name_ru, name_uz, name_en, sort) VALUES (?, ?, ?, ?, ?)
          ON CONFLICT(code) DO UPDATE SET name_ru = excluded.name_ru, name_uz = excluded.name_uz,
            name_en = excluded.name_en, sort = excluded.sort`,
@@ -93,10 +93,10 @@ function ensureReference() {
     }
 
     for (const [regionCode, list] of Object.entries(COUNTRIES)) {
-      const region = get('SELECT id FROM regions WHERE code = ?', regionCode);
+      const region = await get('SELECT id FROM regions WHERE code = ?', regionCode);
       if (!region) continue;
       for (const [iso2, ru, uz, en] of list) {
-        run(
+        await run(
           `INSERT INTO countries (iso2, name_ru, name_uz, name_en, region_id) VALUES (?, ?, ?, ?, ?)
            ON CONFLICT(iso2) DO UPDATE SET name_ru = excluded.name_ru, name_uz = excluded.name_uz,
              name_en = excluded.name_en, region_id = excluded.region_id`,
@@ -105,38 +105,38 @@ function ensureReference() {
       }
     }
 
-    UZ_REGIONS.forEach((region, index) => {
-      run(
+    for (const [index, region] of UZ_REGIONS.entries()) {
+      await run(
         `INSERT INTO uz_regions (code, name_ru, name_uz, name_en, sort) VALUES (?, ?, ?, ?, ?)
          ON CONFLICT(code) DO UPDATE SET name_ru = excluded.name_ru, name_uz = excluded.name_uz,
            name_en = excluded.name_en, sort = excluded.sort`,
         region.code, region.name_ru, region.name_uz, region.name_en, index + 1
       );
-    });
+    }
 
     for (const [kind, items] of Object.entries(DICTIONARIES)) {
-      items.forEach((item, index) => {
-        run(
+      for (const [index, item] of items.entries()) {
+        await run(
           `INSERT INTO dictionaries (kind, code, name_ru, name_uz, name_en, color, sort, is_system)
            VALUES (?, ?, ?, ?, ?, ?, ?, 1)
            ON CONFLICT(kind, code) DO NOTHING`,
           kind, item.code, item.name_ru, item.name_uz || '', item.name_en || '', item.color || '', index + 1
         );
-      });
+      }
     }
 
     // Отличаем «настройки нет в базе» от «значение равно null»: передавать сюда
     // undefined нельзя — параметр getSetting по умолчанию равен null.
     for (const [key, value] of Object.entries(DEFAULT_SETTINGS)) {
-      if (getSetting(key, MISSING) === MISSING) setSetting(key, value);
+      if ((await getSetting(key, MISSING)) === MISSING) await setSetting(key, value);
     }
 
     // Смена наименования организации в уже развёрнутых системах.
     // Заменяем только прежнее значение по умолчанию: собственную формулировку
     // администратора не трогаем.
     const PREVIOUS_ORG = 'Министерство инвестиций, промышленности и торговли Республики Узбекистан';
-    if (getSetting('org.ministry', '') === PREVIOUS_ORG) {
-      setSetting('org.ministry', DEFAULT_SETTINGS['org.ministry']);
+    if ((await getSetting('org.ministry', '')) === PREVIOUS_ORG) {
+      await setSetting('org.ministry', DEFAULT_SETTINGS['org.ministry']);
     }
   });
 }

@@ -78,10 +78,10 @@ const STEP_COLUMNS = [
   { header: 'Выполнен', key: 'done_at', type: 'date', width: 16 },
 ];
 
-function projectRows(query) {
-  const rows = allProjects(query);
+async function projectRows(query) {
+  const rows = await allProjects(query);
   const ids = rows.map((r) => r.id);
-  const customValues = cf.exportValues('project', 'project', ids);
+  const customValues = await cf.exportValues('project', 'project', ids);
   return rows.map((row) => ({
     ...row,
     area_label: AREA_LABELS[row.area] || row.area,
@@ -89,9 +89,9 @@ function projectRows(query) {
   }));
 }
 
-function visitRows(query) {
-  const rows = allVisits(query);
-  const customValues = cf.exportValues('visit', 'visit', rows.map((r) => r.id));
+async function visitRows(query) {
+  const rows = await allVisits(query);
+  const customValues = await cf.exportValues('visit', 'visit', rows.map((r) => r.id));
   return rows.map((row) => ({
     ...row,
     direction_label: DIRECTION_LABELS[row.direction] || row.direction,
@@ -99,7 +99,7 @@ function visitRows(query) {
   }));
 }
 
-function stepRows(query) {
+async function stepRows(query) {
   const today = new Date().toISOString().slice(0, 10);
   const where = ['s.is_deleted = 0', 'p.is_deleted = 0'];
   const params = [];
@@ -109,13 +109,13 @@ function stepRows(query) {
   if (query.date_from) { where.push('s.due_date >= ?'); params.push(query.date_from); }
   if (query.date_to) { where.push('s.due_date <= ?'); params.push(query.date_to); }
 
-  return all(
+  return (await all(
     `SELECT s.*, p.code AS project_code, p.title AS project_title, u.full_name AS responsible_name
      FROM roadmap_steps s JOIN projects p ON p.id = s.project_id
      LEFT JOIN users u ON u.id = s.responsible_user_id
      WHERE ${where.join(' AND ')} ORDER BY s.due_date IS NULL, s.due_date LIMIT 20000`,
     ...params
-  ).map((row) => ({
+  )).map((row) => ({
     ...row,
     state_label: STATE_LABELS[row.state] || row.state,
     overdue_label: row.state !== 'done' && row.due_date && row.due_date < today ? 'Да' : 'Нет',
@@ -123,8 +123,8 @@ function stepRows(query) {
 }
 
 /** Построчная выгрузка: одна строка на пару «проект — регион реализации». */
-function uzLocationRows() {
-  return all(
+async function uzLocationRows() {
+  return await all(
     `SELECT p.code, p.title, ur.name_ru AS region_name, pl.locality, pl.amount AS region_amount,
             p.amount AS project_amount, p.currency, d.name_ru AS status_name,
             u.full_name AS responsible_name,
@@ -153,11 +153,11 @@ const UZ_LOCATION_COLUMNS = [
 ];
 
 const DATASETS = {
-  projects: { name: 'Проекты и соглашения', columns: () => [...PROJECT_COLUMNS, ...cf.exportColumns('project')], rows: projectRows },
-  visits:   { name: 'Визиты', columns: () => [...VISIT_COLUMNS, ...cf.exportColumns('visit')], rows: visitRows },
-  companies:{ name: 'Компании', columns: () => COMPANY_COLUMNS, rows: (q) => allCompanies(q) },
-  steps:    { name: 'Этапы дорожных карт', columns: () => STEP_COLUMNS, rows: stepRows },
-  uz_locations: { name: 'Проекты по регионам Узбекистана', columns: () => UZ_LOCATION_COLUMNS, rows: uzLocationRows },
+  projects: { name: 'Проекты и соглашения', columns: async () => [...PROJECT_COLUMNS, ...(await cf.exportColumns('project'))], rows: projectRows },
+  visits:   { name: 'Визиты', columns: async () => [...VISIT_COLUMNS, ...(await cf.exportColumns('visit'))], rows: visitRows },
+  companies:{ name: 'Компании', columns: async () => COMPANY_COLUMNS, rows: (q) => allCompanies(q) },
+  steps:    { name: 'Этапы дорожных карт', columns: async () => STEP_COLUMNS, rows: stepRows },
+  uz_locations: { name: 'Проекты по регионам Узбекистана', columns: async () => UZ_LOCATION_COLUMNS, rows: uzLocationRows },
 };
 
 const fileTimestamp = () => new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
@@ -169,10 +169,10 @@ router.get('/api/export/:dataset', async (ctx) => {
   if (!dataset) throw notFound('Неизвестный набор данных для выгрузки');
 
   const format = ctx.query.format === 'csv' ? 'csv' : 'xlsx';
-  const columns = dataset.columns();
-  const rows = dataset.rows(ctx.query);
+  const columns = await dataset.columns();
+  const rows = await dataset.rows(ctx.query);
 
-  audit.record({
+  await audit.record({
     user, action: 'export', entityType: ctx.params.dataset,
     summary: `Выгрузка «${dataset.name}» в формате ${format.toUpperCase()}: строк — ${rows.length}`, req: ctx.req,
   });
@@ -192,8 +192,8 @@ router.get('/api/export/:dataset', async (ctx) => {
 router.get('/api/export/report/portfolio', async (ctx) => {
   const user = ctx.requireUser();
   rbac.require(user, 'report.export');
-  const projects = projectRows(ctx.query);
-  const rates = getSetting('currency.rates_to_usd', { USD: 1 });
+  const projects = await projectRows(ctx.query);
+  const rates = await getSetting('currency.rates_to_usd', { USD: 1 });
   const toUsd = (row) => (row.amount || 0) * (Number(rates[row.currency]) || 0);
 
   const summarize = (keyFn, labelFn) => {
@@ -217,7 +217,7 @@ router.get('/api/export/report/portfolio', async (ctx) => {
   ];
 
   // Разрез по регионам Узбекистана: проект учитывается в каждом своём регионе
-  const uzRows = all(
+  const uzRows = (await all(
     `SELECT ur.name_ru AS label, COUNT(DISTINCT pl.project_id) AS count,
             COUNT(DISTINCT CASE WHEN p.status_code IN ('agreement_signed','implementation','completed')
                   THEN pl.project_id END) AS signed,
@@ -227,7 +227,7 @@ router.get('/api/export/report/portfolio', async (ctx) => {
      JOIN uz_regions ur ON ur.id = pl.uz_region_id
      JOIN projects p ON p.id = pl.project_id AND p.is_deleted = 0
      GROUP BY ur.id ORDER BY count DESC, ur.sort`
-  ).map((row) => ({ ...row, amount_usd: Math.round(row.amount_usd), localities: (row.localities || '').split(',').join('; ') }));
+  )).map((row) => ({ ...row, amount_usd: Math.round(row.amount_usd), localities: (row.localities || '').split(',').join('; ') }));
 
   const workbook = buildWorkbook([
     { name: 'По регионам', columns: summaryColumns, rows: summarize((p) => p.region_code, (p) => p.region_name) },
@@ -235,10 +235,10 @@ router.get('/api/export/report/portfolio', async (ctx) => {
     { name: 'По отраслям', columns: summaryColumns, rows: summarize((p) => p.sector_code, (p) => p.sector_name) },
     { name: 'По статусам', columns: summaryColumns, rows: summarize((p) => p.status_code, (p) => p.status_name) },
     { name: 'По менеджерам', columns: summaryColumns, rows: summarize((p) => p.responsible_user_id, (p) => p.responsible_name) },
-    { name: 'Реестр проектов', columns: [...PROJECT_COLUMNS, ...cf.exportColumns('project')], rows: projects },
+    { name: 'Реестр проектов', columns: [...PROJECT_COLUMNS, ...(await cf.exportColumns('project'))], rows: projects },
   ]);
 
-  audit.record({ user, action: 'export', entityType: 'report', summary: 'Выгрузка сводного отчёта по портфелю', req: ctx.req });
+  await audit.record({ user, action: 'export', entityType: 'report', summary: 'Выгрузка сводного отчёта по портфелю', req: ctx.req });
   sendBuffer(ctx.res, 200, workbook, {
     'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     'Content-Disposition': `attachment; filename="portfolio-report-${fileTimestamp()}.xlsx"`,
@@ -250,7 +250,7 @@ router.get('/api/export/report/portfolio', async (ctx) => {
 router.get('/api/export/report/managers', async (ctx) => {
   const user = ctx.requireUser();
   rbac.require(user, 'report.export');
-  const rows = all(
+  const rows = await all(
     `SELECT u.full_name, u.email, r.name_ru AS region_name,
             (SELECT COUNT(*) FROM projects p WHERE p.responsible_user_id = u.id AND p.is_deleted = 0) AS projects_total,
             (SELECT COUNT(*) FROM projects p WHERE p.responsible_user_id = u.id AND p.is_deleted = 0
@@ -278,7 +278,7 @@ router.get('/api/export/report/managers', async (ctx) => {
     ],
     rows,
   }]);
-  audit.record({ user, action: 'export', entityType: 'report', summary: 'Выгрузка отчёта по работе менеджеров', req: ctx.req });
+  await audit.record({ user, action: 'export', entityType: 'report', summary: 'Выгрузка отчёта по работе менеджеров', req: ctx.req });
   sendBuffer(ctx.res, 200, workbook, {
     'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     'Content-Disposition': `attachment; filename="managers-report-${fileTimestamp()}.xlsx"`,
@@ -289,12 +289,12 @@ router.get('/api/export/report/managers', async (ctx) => {
 // -------------------------------------------------------------------------
 // Календарь (п. 8.2 ТЗ)
 // -------------------------------------------------------------------------
-function calendarEvents(query = {}) {
+async function calendarEvents(query = {}) {
   const from = query.from || new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
   const to = query.to || new Date(Date.now() + 365 * 86400000).toISOString().slice(0, 10);
   const managerFilter = query.responsible_id ? Number(query.responsible_id) : null;
 
-  const steps = all(
+  const steps = (await all(
     `SELECT s.id, s.title, s.due_date, s.state, s.project_id, p.code, p.title AS project_title,
             u.full_name AS responsible_name, s.responsible_user_id
      FROM roadmap_steps s JOIN projects p ON p.id = s.project_id
@@ -302,7 +302,7 @@ function calendarEvents(query = {}) {
      WHERE s.is_deleted = 0 AND p.is_deleted = 0 AND s.due_date BETWEEN ? AND ?
        ${managerFilter ? 'AND s.responsible_user_id = ?' : ''}`,
     ...(managerFilter ? [from, to, managerFilter] : [from, to])
-  ).map((step) => ({
+  )).map((step) => ({
     type: 'deadline',
     id: `step-${step.id}`,
     title: step.title,
@@ -315,7 +315,7 @@ function calendarEvents(query = {}) {
     color: step.state === 'done' ? '#2e7d4f' : step.due_date < new Date().toISOString().slice(0, 10) ? '#a33a3a' : '#1f4e9e',
   }));
 
-  const visits = all(
+  const visits = (await all(
     `SELECT v.id, v.code, v.cities, v.date_from, v.date_to, v.direction, v.status_code,
             co.name_ru AS country_name, u.full_name AS responsible_name, v.responsible_user_id
      FROM visits v JOIN countries co ON co.id = v.country_id
@@ -323,7 +323,7 @@ function calendarEvents(query = {}) {
      WHERE v.is_deleted = 0 AND v.date_to >= ? AND v.date_from <= ?
        ${managerFilter ? 'AND v.responsible_user_id = ?' : ''}`,
     ...(managerFilter ? [from, to, managerFilter] : [from, to])
-  ).map((visit) => ({
+  )).map((visit) => ({
     type: 'visit',
     id: `visit-${visit.id}`,
     title: `${visit.direction === 'outbound' ? 'Визит' : 'Приём делегации'}: ${visit.country_name}`,
@@ -335,7 +335,7 @@ function calendarEvents(query = {}) {
     color: '#8a5cf0',
   }));
 
-  const meetings = all(
+  const meetings = (await all(
     `SELECT m.id, m.company_name, m.meet_date, m.meet_time, m.venue, m.status_code, m.visit_id,
             v.code AS visit_code, v.responsible_user_id, u.full_name AS responsible_name
      FROM meetings m JOIN visits v ON v.id = m.visit_id
@@ -343,7 +343,7 @@ function calendarEvents(query = {}) {
      WHERE m.is_deleted = 0 AND v.is_deleted = 0 AND m.meet_date BETWEEN ? AND ?
        ${managerFilter ? 'AND v.responsible_user_id = ?' : ''}`,
     ...(managerFilter ? [from, to, managerFilter] : [from, to])
-  ).map((meeting) => ({
+  )).map((meeting) => ({
     type: 'meeting',
     id: `meeting-${meeting.id}`,
     title: `Встреча: ${meeting.company_name}`,
@@ -361,13 +361,13 @@ function calendarEvents(query = {}) {
 
 router.get('/api/calendar', async (ctx) => {
   ctx.requireUser();
-  return { events: calendarEvents(ctx.query) };
+  return { events: await calendarEvents(ctx.query) };
 });
 
 /** Лента iCal для подписки из Outlook / Google Calendar. */
 router.get('/api/calendar.ics', async (ctx) => {
   const user = ctx.requireUser();
-  const events = calendarEvents(ctx.query);
+  const events = await calendarEvents(ctx.query);
   const ics = buildCalendar(
     events.map((event) => ({
       uid: event.id,
@@ -382,7 +382,7 @@ router.get('/api/calendar.ics', async (ctx) => {
     })),
     `Проектный офис — ${user.full_name}`
   );
-  audit.record({ user, action: 'export', entityType: 'calendar', summary: 'Выгрузка календаря в формате iCal', req: ctx.req });
+  await audit.record({ user, action: 'export', entityType: 'calendar', summary: 'Выгрузка календаря в формате iCal', req: ctx.req });
   sendBuffer(ctx.res, 200, Buffer.from(ics, 'utf8'), {
     'Content-Type': 'text/calendar; charset=utf-8',
     'Content-Disposition': 'attachment; filename="project-office.ics"',

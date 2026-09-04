@@ -46,7 +46,7 @@ const PROJECT_SORTS = {
   responsible: 'u.full_name', next_due_date: 'next_due_date', code: 'p.code',
 };
 
-function buildProjectFilters(query = {}) {
+async function buildProjectFilters(query = {}) {
   const where = ['p.is_deleted = 0'];
   const params = [];
   const push = (clause, ...values) => { where.push(clause); params.push(...values); };
@@ -92,7 +92,7 @@ function buildProjectFilters(query = {}) {
             AND s.state <> 'done' AND s.due_date BETWEEN date('now') AND date('now', '+7 day'))`);
   }
   if (query.stale === '1' || query.stale === true) {
-    const staleDays = Number(getSetting('projects.stale_days', 30));
+    const staleDays = Number(await getSetting('projects.stale_days', 30));
     push(`p.last_activity_at < datetime('now', '-${staleDays} day') AND p.status_code NOT IN ('completed','cancelled')`);
   }
   if (query.search) {
@@ -137,18 +137,18 @@ const locationsOf = (projectId) =>
 
 const splitList = (value) => String(value).split(',').map((s) => s.trim()).filter(Boolean);
 
-function listProjects(query = {}) {
-  const { where, params } = buildProjectFilters(query);
+async function listProjects(query = {}) {
+  const { where, params } = await buildProjectFilters(query);
   const sortKey = PROJECT_SORTS[query.sort] || PROJECT_SORTS.updated_at;
   const direction = String(query.dir).toLowerCase() === 'asc' ? 'ASC' : 'DESC';
   const limit = Math.min(Number(query.limit) || 50, 500);
   const offset = Number(query.offset) || 0;
 
-  const rows = all(
+  const rows = await all(
     `${PROJECT_SELECT} WHERE ${where} ORDER BY ${sortKey} ${direction} LIMIT ? OFFSET ?`,
     ...params, limit, offset
   );
-  const total = get(
+  const total = (await get(
     `SELECT COUNT(*) AS n FROM projects p
      JOIN companies c ON c.id = p.company_id
      JOIN countries co ON co.id = p.country_id
@@ -157,22 +157,22 @@ function listProjects(query = {}) {
      LEFT JOIN dictionaries ds ON ds.kind = 'project_status' AND ds.code = p.status_code
      WHERE ${where}`,
     ...params
-  )?.n ?? 0;
+  ))?.n ?? 0;
 
-  return { rows: rows.map(decorateProject), total, limit, offset };
+  return { rows: await Promise.all(rows.map(decorateProject)), total, limit, offset };
 }
 
 /** Все проекты по фильтру без постраничной разбивки — для выгрузок. */
-function allProjects(query = {}) {
-  const { where, params } = buildProjectFilters(query);
+async function allProjects(query = {}) {
+  const { where, params } = await buildProjectFilters(query);
   const sortKey = PROJECT_SORTS[query.sort] || PROJECT_SORTS.updated_at;
   const direction = String(query.dir).toLowerCase() === 'asc' ? 'ASC' : 'DESC';
-  return all(`${PROJECT_SELECT} WHERE ${where} ORDER BY ${sortKey} ${direction} LIMIT 20000`, ...params)
-    .map(decorateProject);
+  const rows = await all(`${PROJECT_SELECT} WHERE ${where} ORDER BY ${sortKey} ${direction} LIMIT 20000`, ...params);
+  return Promise.all(rows.map(decorateProject));
 }
 
-function decorateProject(row) {
-  const staleDays = Number(getSetting('projects.stale_days', 30));
+async function decorateProject(row) {
+  const staleDays = Number(await getSetting('projects.stale_days', 30));
   const lastActivity = new Date(`${String(row.last_activity_at).replace(' ', 'T')}Z`).getTime();
   return {
     ...row,
@@ -181,8 +181,8 @@ function decorateProject(row) {
       !['completed', 'cancelled'].includes(row.status_code) &&
       Number.isFinite(lastActivity) && Date.now() - lastActivity > staleDays * 86400000,
     progress: row.steps_total ? Math.round((row.steps_done / row.steps_total) * 100) : 0,
-    partners: partnersOf(row.id),
-    locations: locationsOf(row.id),
+    partners: await partnersOf(row.id),
+    locations: await locationsOf(row.id),
   };
 }
 
@@ -221,17 +221,17 @@ function buildVisitFilters(query = {}) {
   return { where: where.join(' AND '), params };
 }
 
-function listVisits(query = {}) {
+async function listVisits(query = {}) {
   const { where, params } = buildVisitFilters(query);
   const limit = Math.min(Number(query.limit) || 50, 500);
   const offset = Number(query.offset) || 0;
   const direction = String(query.dir).toLowerCase() === 'asc' ? 'ASC' : 'DESC';
-  const rows = all(`${VISIT_SELECT} WHERE ${where} ORDER BY v.date_from ${direction} LIMIT ? OFFSET ?`, ...params, limit, offset);
-  const total = get(
+  const rows = await all(`${VISIT_SELECT} WHERE ${where} ORDER BY v.date_from ${direction} LIMIT ? OFFSET ?`, ...params, limit, offset);
+  const total = (await get(
     `SELECT COUNT(*) AS n FROM visits v JOIN countries co ON co.id = v.country_id
      JOIN regions r ON r.id = co.region_id JOIN users u ON u.id = v.responsible_user_id WHERE ${where}`,
     ...params
-  )?.n ?? 0;
+  ))?.n ?? 0;
   return { rows, total, limit, offset };
 }
 
@@ -256,7 +256,7 @@ const COMPANY_SELECT = `
   LEFT JOIN users u      ON u.id = c.responsible_user_id
 `;
 
-function listCompanies(query = {}) {
+async function listCompanies(query = {}) {
   const where = ['c.is_deleted = 0', 'c.merged_into_id IS NULL'];
   const params = [];
   if (query.country_id) { where.push('c.country_id = ?'); params.push(Number(query.country_id)); }
@@ -277,7 +277,7 @@ function listCompanies(query = {}) {
   const clause = where.join(' AND ');
   const limit = Math.min(Number(query.limit) || 50, 500);
   const offset = Number(query.offset) || 0;
-  const rows = all(`${COMPANY_SELECT} WHERE ${clause} ORDER BY c.name LIMIT ? OFFSET ?`, ...params, limit, offset)
+  const rows = (await all(`${COMPANY_SELECT} WHERE ${clause} ORDER BY c.name LIMIT ? OFFSET ?`, ...params, limit, offset))
     .map((row) => ({
       ...row,
       is_local: Boolean(row.is_local),
@@ -286,15 +286,15 @@ function listCompanies(query = {}) {
         : row.partner_projects_count ? 'local'
         : row.projects_count ? 'foreign' : (row.is_local ? 'local' : 'foreign'),
     }));
-  const total = get(
+  const total = (await get(
     `SELECT COUNT(*) AS n FROM companies c LEFT JOIN countries co ON co.id = c.country_id
      LEFT JOIN regions r ON r.id = co.region_id WHERE ${clause}`,
     ...params
-  )?.n ?? 0;
+  ))?.n ?? 0;
   return { rows, total, limit, offset };
 };
 
-const allCompanies = (query = {}) => listCompanies({ ...query, limit: 5000 }).rows;
+const allCompanies = async (query = {}) => (await listCompanies({ ...query, limit: 5000 })).rows;
 
 module.exports = {
   PROJECT_SELECT, VISIT_SELECT, COMPANY_SELECT, partnersOf, locationsOf,

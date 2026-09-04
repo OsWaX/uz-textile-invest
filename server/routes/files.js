@@ -20,14 +20,14 @@ router.post('/api/attachments', async (ctx) => {
   const entityType = v.oneOf(fields.entity_type, 'Тип записи', ['project', 'company', 'visit', 'step', 'meeting']);
   const entityId = v.int(fields.entity_id, 'Запись', { required: true });
 
-  return files.map((file) =>
+  return Promise.all(files.map((file) =>
     entities.saveAttachment({ entityType, entityId, file, user, req: ctx.req })
-  );
+  ));
 });
 
 router.get('/api/attachments/:id', async (ctx) => {
   ctx.requireUser();
-  const attachment = get('SELECT * FROM attachments WHERE id = ? AND is_deleted = 0', Number(ctx.params.id));
+  const attachment = await get('SELECT * FROM attachments WHERE id = ? AND is_deleted = 0', Number(ctx.params.id));
   if (!attachment) throw notFound('Файл не найден');
 
   // Защита от выхода за пределы каталога загрузок.

@@ -19,7 +19,7 @@ test.before(async () => {
   admin = createClient();
   await admin.login('admin@textile.gov.uz', PASSWORD);
 
-  const region = db.get("SELECT id FROM regions WHERE code = 'europe'");
+  const region = await db.get("SELECT id FROM regions WHERE code = 'europe'");
   const created = await admin.post('/api/admin/users', {
     email: 'pm.uz@textile.gov.uz', full_name: 'Каримова Дилноза Шухратовна',
     role: 'team', region_id: region.id, password: PASSWORD,
@@ -28,10 +28,10 @@ test.before(async () => {
   manager = createClient();
   await manager.login('pm.uz@textile.gov.uz', PASSWORD);
 
-  ctx.countryTr = db.get("SELECT id FROM countries WHERE iso2 = 'TR'").id;
-  ctx.countryUz = db.get("SELECT id FROM countries WHERE iso2 = 'UZ'").id;
-  ctx.namangan = db.get("SELECT id FROM uz_regions WHERE code = 'namangan'").id;
-  ctx.fergana = db.get("SELECT id FROM uz_regions WHERE code = 'fergana'").id;
+  ctx.countryTr = (await db.get("SELECT id FROM countries WHERE iso2 = 'TR'")).id;
+  ctx.countryUz = (await db.get("SELECT id FROM countries WHERE iso2 = 'UZ'")).id;
+  ctx.namangan = (await db.get("SELECT id FROM uz_regions WHERE code = 'namangan'")).id;
+  ctx.fergana = (await db.get("SELECT id FROM uz_regions WHERE code = 'fergana'")).id;
 
   const foreign = await admin.post('/api/companies', { name: 'Anadolu Tekstil A.S.', country_id: ctx.countryTr });
   ctx.foreignId = foreign.body.id;
@@ -128,8 +128,16 @@ test('Сценарий 3: повтор региона и повтор партн
   assert.match(dupPartner.body.error, /уже указана как местный партнёр/i);
 
   // Ограничение действует и на уровне базы данных
-  const unique = db.all("SELECT sql FROM sqlite_master WHERE name = 'project_locations'")[0].sql;
-  assert.match(unique, /UNIQUE \(project_id, uz_region_id\)/);
+  const unique = await db.get(
+    `SELECT COUNT(*) AS n
+     FROM pg_indexes
+     WHERE schemaname = current_schema()
+       AND tablename = 'project_locations'
+       AND indexdef LIKE '%UNIQUE%'
+       AND indexdef LIKE '%project_id%'
+       AND indexdef LIKE '%uz_region_id%'`
+  );
+  assert.equal(unique.n, 1);
 });
 
 test('Иностранный партнёр не может быть указан местным партнёром того же проекта', async () => {
@@ -191,13 +199,13 @@ test('Сценарий 6: дашборд считает проекты по ре
   assert.ok(namangan.localities.includes('г. Наманган'), 'населённые пункты перечислены');
 
   // Сверка с расчётом по базе данных
-  const expected = db.get(
+  const expected = await db.get(
     `SELECT COUNT(*) AS n FROM project_locations pl
      JOIN uz_regions ur ON ur.id = pl.uz_region_id
      JOIN projects p ON p.id = pl.project_id AND p.is_deleted = 0
      WHERE ur.code = 'namangan'`
-  ).n;
-  assert.equal(namangan.count, expected, 'число совпадает с расчётом по базе');
+  );
+  assert.equal(namangan.count, expected.n, 'число совпадает с расчётом по базе');
 
   const summary = dashboard.body.uz_summary;
   assert.equal(summary.regions_total, 14);

@@ -16,8 +16,8 @@ const FIELD_LABELS = {
   industry: 'Отрасль / сегмент', profile: 'Краткая справка', responsible_user_id: 'Ответственный',
 };
 
-function loadCompany(id) {
-  const row = get(`${COMPANY_SELECT} WHERE c.id = ? AND c.is_deleted = 0`, Number(id));
+async function loadCompany(id) {
+  const row = await get(`${COMPANY_SELECT} WHERE c.id = ? AND c.is_deleted = 0`, Number(id));
   if (!row) throw notFound('Компания не найдена');
   return row;
 }
@@ -42,7 +42,7 @@ router.get('/api/companies/similar', async (ctx) => {
   if (name.length < 3) return [];
   const words = name.split(' ').filter((w) => w.length > 2);
   if (!words.length) return [];
-  const rows = all(
+  const rows = await all(
     'SELECT id, name, city, country_id FROM companies WHERE is_deleted = 0 AND merged_into_id IS NULL LIMIT 2000'
   );
   return rows
@@ -59,11 +59,11 @@ router.get('/api/companies/similar', async (ctx) => {
 
 router.get('/api/companies/:id', async (ctx) => {
   const user = ctx.requireUser();
-  const company = loadCompany(ctx.params.id);
-  const custom = cf.valuesFor('company', company.id, user.id);
+  const company = await loadCompany(ctx.params.id);
+  const custom = await cf.valuesFor('company', company.id, user.id);
 
   // Требование ТЗ: карточка компании показывает все её проекты, встречи и суммы.
-  const projects = all(
+  const projects = await all(
     `SELECT p.id, p.code, p.title, p.status_code, p.area, p.amount, p.currency, p.sector_code,
             d.name_ru AS status_name, d.color AS status_color, u.full_name AS responsible_name,
             co.name_ru AS country_name
@@ -75,7 +75,7 @@ router.get('/api/companies/:id', async (ctx) => {
     company.id
   );
 
-  const meetings = all(
+  const meetings = await all(
     `SELECT m.*, v.code AS visit_code, v.direction, v.date_from, v.date_to, v.id AS visit_id,
             d.name_ru AS status_name, d.color AS status_color
      FROM meetings m JOIN visits v ON v.id = m.visit_id
@@ -85,7 +85,7 @@ router.get('/api/companies/:id', async (ctx) => {
   );
 
   // Проекты, где компания выступает узбекской стороной (дополнение № 1 к ТЗ)
-  const partnerProjects = all(
+  const partnerProjects = await all(
     `SELECT p.id, p.code, p.title, p.status_code, p.area, p.amount, p.currency,
             pp.role_note, d.name_ru AS status_name, d.color AS status_color,
             u.full_name AS responsible_name, co.name_ru AS country_name
@@ -112,7 +112,7 @@ router.get('/api/companies/:id', async (ctx) => {
 
   return {
     ...company,
-    contacts: all("SELECT * FROM contacts WHERE entity_type = 'company' AND entity_id = ? ORDER BY id", company.id),
+    contacts: await all("SELECT * FROM contacts WHERE entity_type = 'company' AND entity_id = ? ORDER BY id", company.id),
     projects,
     partner_projects: partnerProjects,
     partner_totals: partnerTotals,
@@ -120,22 +120,22 @@ router.get('/api/companies/:id', async (ctx) => {
       : partnerProjects.length ? 'local' : 'foreign',
     meetings,
     totals,
-    attachments: entities.listAttachments('company', company.id, { allVersions: true }),
-    comments: entities.listComments('company', company.id),
-    custom_fields: cf.listFields('company'),
+    attachments: await entities.listAttachments('company', company.id, { allVersions: true }),
+    comments: await entities.listComments('company', company.id),
+    custom_fields: await cf.listFields('company'),
     custom_values: custom.values,
     polls: custom.polls,
   };
 });
 
-function readCompanyPayload(body, { partial = false } = {}) {
+async function readCompanyPayload(body, { partial = false } = {}) {
   const required = !partial;
   const data = {};
   const has = (key) => Object.prototype.hasOwnProperty.call(body, key);
   if (required || has('name')) data.name = v.str(body.name, FIELD_LABELS.name, { required, max: 300 });
   if (required || has('country_id')) {
     data.country_id = v.int(body.country_id, FIELD_LABELS.country_id, { required });
-    if (data.country_id && !get('SELECT id FROM countries WHERE id = ?', data.country_id)) throw badRequest('Страна не найдена');
+    if (data.country_id && !(await get('SELECT id FROM countries WHERE id = ?', data.country_id))) throw badRequest('Страна не найдена');
   }
   if (has('city')) data.city = v.str(body.city, FIELD_LABELS.city, { max: 120 });
   if (has('website')) data.website = v.str(body.website, FIELD_LABELS.website, { max: 300 });
@@ -148,11 +148,11 @@ function readCompanyPayload(body, { partial = false } = {}) {
 router.post('/api/companies', async (ctx) => {
   const user = ctx.requireUser();
   rbac.require(user, 'company.create');
-  const data = readCompanyPayload(ctx.body);
+  const data = await readCompanyPayload(ctx.body);
   if (!data.responsible_user_id) data.responsible_user_id = user.id;
 
-  const company = transaction(() => {
-    const result = run(
+  const company = await transaction(async () => {
+    const result = await run(
       `INSERT INTO companies (name, country_id, city, website, industry, profile, responsible_user_id, created_by, updated_by)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       data.name, data.country_id, data.city || '', data.website || '', data.industry || '',
@@ -160,7 +160,7 @@ router.post('/api/companies', async (ctx) => {
     );
     const companyId = Number(result.lastInsertRowid);
     for (const contact of v.array(ctx.body.contacts, 'Контактные лица', { max: 20 })) {
-      run(
+      await run(
         `INSERT INTO contacts (entity_type, entity_id, full_name, position, phone, email, note)
          VALUES ('company', ?, ?, ?, ?, ?, ?)`,
         companyId,
@@ -171,11 +171,11 @@ router.post('/api/companies', async (ctx) => {
         v.str(contact.note, 'Примечание', { max: 500 })
       );
     }
-    cf.saveValues('company', 'company', companyId, ctx.body.custom_values || {}, user);
-    return loadCompany(companyId);
+    await cf.saveValues('company', 'company', companyId, ctx.body.custom_values || {}, user);
+    return await loadCompany(companyId);
   });
 
-  audit.record({
+  await audit.record({
     user, action: 'create', entityType: 'company', entityId: company.id,
     summary: `Создана компания «${company.name}»`, changes: audit.diff({}, data, FIELD_LABELS), req: ctx.req,
   });
@@ -185,19 +185,19 @@ router.post('/api/companies', async (ctx) => {
 router.patch('/api/companies/:id', async (ctx) => {
   const user = ctx.requireUser();
   rbac.require(user, 'company.edit');
-  const before = loadCompany(ctx.params.id);
-  const data = readCompanyPayload(ctx.body, { partial: true });
+  const before = await loadCompany(ctx.params.id);
+  const data = await readCompanyPayload(ctx.body, { partial: true });
   if (Object.keys(data).length) {
     const assignments = Object.keys(data).map((key) => `${key} = ?`).join(', ');
-    run(
+    await run(
       `UPDATE companies SET ${assignments}, updated_by = ?, updated_at = datetime('now') WHERE id = ?`,
       ...Object.values(data), user.id, before.id
     );
   }
-  if (ctx.body.custom_values) cf.saveValues('company', 'company', before.id, ctx.body.custom_values, user);
+  if (ctx.body.custom_values) await cf.saveValues('company', 'company', before.id, ctx.body.custom_values, user);
 
-  const after = loadCompany(before.id);
-  audit.record({
+  const after = await loadCompany(before.id);
+  await audit.record({
     user, action: 'update', entityType: 'company', entityId: before.id,
     summary: `Изменена компания «${before.name}»`,
     changes: audit.diff(Object.fromEntries(Object.keys(data).map((k) => [k, before[k]])), data, FIELD_LABELS),
@@ -209,14 +209,14 @@ router.patch('/api/companies/:id', async (ctx) => {
 router.delete('/api/companies/:id', async (ctx) => {
   const user = ctx.requireUser();
   rbac.require(user, 'company.delete');
-  const company = loadCompany(ctx.params.id);
+  const company = await loadCompany(ctx.params.id);
   // Целостность данных (раздел 11 ТЗ): нельзя удалить компанию со связанными проектами.
-  const linked = get('SELECT COUNT(*) AS n FROM projects WHERE company_id = ? AND is_deleted = 0', company.id).n;
-  const asPartner = get(
+  const linked = (await get('SELECT COUNT(*) AS n FROM projects WHERE company_id = ? AND is_deleted = 0', company.id)).n;
+  const asPartner = (await get(
     `SELECT COUNT(*) AS n FROM project_partners pp JOIN projects p ON p.id = pp.project_id
      WHERE pp.company_id = ? AND p.is_deleted = 0`,
     company.id
-  ).n;
+  )).n;
   if (linked > 0 || asPartner > 0) {
     const parts = [];
     if (linked > 0) parts.push(`как иностранный партнёр — ${linked}`);
@@ -226,8 +226,8 @@ router.delete('/api/companies/:id', async (ctx) => {
       { linked, as_partner: asPartner }
     );
   }
-  run("UPDATE companies SET is_deleted = 1, deleted_at = datetime('now'), deleted_by = ? WHERE id = ?", user.id, company.id);
-  audit.record({ user, action: 'delete', entityType: 'company', entityId: company.id, summary: `Удалена компания «${company.name}»`, req: ctx.req });
+  await run("UPDATE companies SET is_deleted = 1, deleted_at = datetime('now'), deleted_by = ? WHERE id = ?", user.id, company.id);
+  await audit.record({ user, action: 'delete', entityType: 'company', entityId: company.id, summary: `Удалена компания «${company.name}»`, req: ctx.req });
   return { ok: true };
 });
 
@@ -235,41 +235,41 @@ router.delete('/api/companies/:id', async (ctx) => {
 router.post('/api/companies/:id/merge', async (ctx) => {
   const user = ctx.requireUser();
   rbac.require(user, 'company.merge');
-  const target = loadCompany(ctx.params.id);
+  const target = await loadCompany(ctx.params.id);
   const sourceId = v.int(ctx.body.source_id, 'Компания-дубликат', { required: true });
   if (sourceId === target.id) throw badRequest('Нельзя объединить компанию саму с собой');
-  const source = loadCompany(sourceId);
+  const source = await loadCompany(sourceId);
 
-  transaction(() => {
-    run('UPDATE projects SET company_id = ? WHERE company_id = ?', target.id, source.id);
+  await transaction(async () => {
+    await run('UPDATE projects SET company_id = ? WHERE company_id = ?', target.id, source.id);
     // Переносим роль местного партнёра, не создавая дублей в одном проекте
-    run(`DELETE FROM project_partners WHERE company_id = ? AND project_id IN
+    await run(`DELETE FROM project_partners WHERE company_id = ? AND project_id IN
            (SELECT project_id FROM project_partners WHERE company_id = ?)`, source.id, target.id);
-    run('UPDATE project_partners SET company_id = ? WHERE company_id = ?', target.id, source.id);
-    run('UPDATE meetings SET company_id = ? WHERE company_id = ?', target.id, source.id);
-    run("UPDATE contacts SET entity_id = ? WHERE entity_type = 'company' AND entity_id = ?", target.id, source.id);
-    run("UPDATE attachments SET entity_id = ? WHERE entity_type = 'company' AND entity_id = ?", target.id, source.id);
-    run(
+    await run('UPDATE project_partners SET company_id = ? WHERE company_id = ?', target.id, source.id);
+    await run('UPDATE meetings SET company_id = ? WHERE company_id = ?', target.id, source.id);
+    await run("UPDATE contacts SET entity_id = ? WHERE entity_type = 'company' AND entity_id = ?", target.id, source.id);
+    await run("UPDATE attachments SET entity_id = ? WHERE entity_type = 'company' AND entity_id = ?", target.id, source.id);
+    await run(
       "UPDATE companies SET is_deleted = 1, merged_into_id = ?, deleted_at = datetime('now'), deleted_by = ? WHERE id = ?",
       target.id, user.id, source.id
     );
   });
 
-  audit.record({
+  await audit.record({
     user, action: 'update', entityType: 'company', entityId: target.id,
     summary: `Объединение дубликатов: «${source.name}» → «${target.name}»`,
     changes: [{ field: 'merge', label: 'Объединение', from: source.name, to: target.name }], req: ctx.req,
   });
-  return loadCompany(target.id);
+  return await loadCompany(target.id);
 });
 
 router.post('/api/companies/:id/contacts', async (ctx) => {
   const user = ctx.requireUser();
-  const company = loadCompany(ctx.params.id);
+  const company = await loadCompany(ctx.params.id);
   if (!rbac.can(user, 'company.edit') && company.created_by !== user.id && company.responsible_user_id !== user.id) {
     throw badRequest('Добавлять контакты можно только к своим записям');
   }
-  const result = run(
+  const result = await run(
     `INSERT INTO contacts (entity_type, entity_id, full_name, position, phone, email, note)
      VALUES ('company', ?, ?, ?, ?, ?, ?)`,
     company.id,
@@ -279,14 +279,14 @@ router.post('/api/companies/:id/contacts', async (ctx) => {
     v.email(ctx.body.email, 'Электронная почта'),
     v.str(ctx.body.note, 'Примечание', { max: 500 })
   );
-  audit.record({ user, action: 'update', entityType: 'company', entityId: company.id, summary: 'Добавлено контактное лицо', req: ctx.req });
-  return get('SELECT * FROM contacts WHERE id = ?', Number(result.lastInsertRowid));
+  await audit.record({ user, action: 'update', entityType: 'company', entityId: company.id, summary: 'Добавлено контактное лицо', req: ctx.req });
+  return await get('SELECT * FROM contacts WHERE id = ?', Number(result.lastInsertRowid));
 });
 
 router.post('/api/companies/:id/comments', async (ctx) => {
   const user = ctx.requireUser();
-  loadCompany(ctx.params.id);
-  return entities.addComment({ entityType: 'company', entityId: Number(ctx.params.id), body: ctx.body.body, user, req: ctx.req });
+  await loadCompany(ctx.params.id);
+  return await entities.addComment({ entityType: 'company', entityId: Number(ctx.params.id), body: ctx.body.body, user, req: ctx.req });
 });
 
 module.exports = router;

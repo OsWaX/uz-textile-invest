@@ -23,7 +23,7 @@ test.before(async () => {
   await admin.login('admin@textile.gov.uz', PASSWORD);
 
   // Проектный менеджер по Европе
-  const region = db.get("SELECT id FROM regions WHERE code = 'europe'");
+  const region = await db.get("SELECT id FROM regions WHERE code = 'europe'");
   const created = await admin.post('/api/admin/users', {
     email: 'pm.europe@textile.gov.uz',
     full_name: 'Каримова Дилноза Шухратовна',
@@ -38,8 +38,8 @@ test.before(async () => {
   manager = createClient();
   await manager.login('pm.europe@textile.gov.uz', PASSWORD);
 
-  context.countryDe = db.get("SELECT id FROM countries WHERE iso2 = 'DE'").id;
-  context.countryIt = db.get("SELECT id FROM countries WHERE iso2 = 'IT'").id;
+  context.countryDe = (await db.get("SELECT id FROM countries WHERE iso2 = 'DE'")).id;
+  context.countryIt = (await db.get("SELECT id FROM countries WHERE iso2 = 'IT'")).id;
 });
 
 test.after(async () => {
@@ -163,7 +163,7 @@ test('Сценарий 3: истёкший срок делает этап про
   assert.ok(list.body.rows.some((p) => p.id === context.projectId), 'проект попадает в фильтр «просроченные этапы»');
 
   // Планировщик формирует уведомления с эскалацией руководству
-  const created = notify.runOverdueChecks();
+  const created = await notify.runOverdueChecks();
   assert.ok(created > 0, 'создано хотя бы одно уведомление о просрочке');
 
   const managerInbox = await manager.get('/api/notifications');
@@ -179,7 +179,7 @@ test('Сценарий 3: истёкший срок делает этап про
   );
 
   // Повторный запуск не создаёт дубликатов
-  const again = notify.runOverdueChecks();
+  const again = await notify.runOverdueChecks();
   assert.equal(again, 0, 'повторные уведомления не дублируются');
 });
 
@@ -287,10 +287,11 @@ test('Сценарий 5: визит со встречами формирует 
 // ---------------------------------------------------------------------------
 test('Сценарий 6: дашборд по одному региону совпадает с расчётом вручную', async () => {
   // Проект в другом регионе — не должен попасть в выборку по Европе
-  const other = await admin.post('/api/companies', { name: 'Shandong Silk Co.', country_id: db.get("SELECT id FROM countries WHERE iso2='CN'").id });
+  const china = await db.get("SELECT id FROM countries WHERE iso2='CN'");
+  const other = await admin.post('/api/companies', { name: 'Shandong Silk Co.', country_id: china.id });
   await admin.post('/api/projects', {
     record_type: 'contract', sector_code: 'silk', area: 'export',
-    country_id: db.get("SELECT id FROM countries WHERE iso2='CN'").id,
+    country_id: china.id,
     company_id: other.body.id, title: 'Экспорт шёлка-сырца в КНР',
     amount: 12600000, currency: 'USD', status_code: 'implementation',
     contacts: [{ full_name: 'Ли Вэй' }],
@@ -299,7 +300,7 @@ test('Сценарий 6: дашборд по одному региону сов
   const dashboard = await admin.get('/api/dashboard?region=europe');
   const europe = dashboard.body;
 
-  const expected = db.all(
+  const expected = await db.all(
     `SELECT p.amount FROM projects p JOIN countries c ON c.id = p.country_id
      JOIN regions r ON r.id = c.region_id
      WHERE p.is_deleted = 0 AND r.code = 'europe'`

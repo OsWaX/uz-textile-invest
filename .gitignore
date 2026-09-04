@@ -1,11 +1,9 @@
 node_modules/
-data/*.db
 data/.session-secret
-data/*.db-journal
-data/*.db-wal
-data/*.db-shm
 data/uploads/*
 !data/uploads/.gitkeep
+backups/*
+!backups/.gitkeep
 .env
 *.log
 .DS_Store

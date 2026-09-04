@@ -49,8 +49,8 @@ function diff(before, after, fieldLabels = {}) {
   return changes;
 }
 
-function record({ user, action, entityType = '', entityId = null, summary = '', changes = [], req = null }) {
-  run(
+async function record({ user, action, entityType = '', entityId = null, summary = '', changes = [], req = null }) {
+  await run(
     `INSERT INTO audit_log (user_id, user_label, action, entity_type, entity_id, summary, changes_json, ip, user_agent)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     user?.id ?? null,
@@ -65,7 +65,7 @@ function record({ user, action, entityType = '', entityId = null, summary = '', 
   );
 }
 
-function query({ userId, action, entityType, entityId, from, to, search, limit = 100, offset = 0 }) {
+async function query({ userId, action, entityType, entityId, from, to, search, limit = 100, offset = 0 }) {
   const where = ['1 = 1'];
   const params = [];
   if (userId) { where.push('user_id = ?'); params.push(Number(userId)); }
@@ -80,13 +80,13 @@ function query({ userId, action, entityType, entityId, from, to, search, limit =
     params.push(like, like, like);
   }
   const sql = `SELECT * FROM audit_log WHERE ${where.join(' AND ')} ORDER BY id DESC LIMIT ? OFFSET ?`;
-  const rows = all(sql, ...params, Number(limit), Number(offset)).map((row) => ({
+  const rows = (await all(sql, ...params, Number(limit), Number(offset))).map((row) => ({
     ...row,
     changes: JSON.parse(row.changes_json || '[]'),
     action_label: ACTION_LABELS[row.action] || row.action,
     entity_label: ENTITY_LABELS[row.entity_type] || row.entity_type,
   }));
-  const total = get(`SELECT COUNT(*) AS n FROM audit_log WHERE ${where.join(' AND ')}`, ...params)?.n ?? 0;
+  const total = (await get(`SELECT COUNT(*) AS n FROM audit_log WHERE ${where.join(' AND ')}`, ...params))?.n ?? 0;
   return { rows, total };
 }
 

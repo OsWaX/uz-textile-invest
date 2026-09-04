@@ -36,10 +36,10 @@ const ENTITY_TABLES = {
   meeting: 'meetings',
 };
 
-function assertEntityExists(entityType, entityId) {
+async function assertEntityExists(entityType, entityId) {
   const table = ENTITY_TABLES[entityType];
   if (!table) throw badRequest('Неизвестный тип записи');
-  const row = get(`SELECT id FROM ${table} WHERE id = ? AND is_deleted = 0`, entityId);
+  const row = await get(`SELECT id FROM ${table} WHERE id = ? AND is_deleted = 0`, entityId);
   if (!row) throw notFound('Запись не найдена');
 }
 
@@ -47,8 +47,8 @@ function assertEntityExists(entityType, entityId) {
  * Сохраняет файл. Версионность: повторная загрузка файла с тем же именем
  * создаёт новую версию, прежняя остаётся доступной (раздел 10 ТЗ).
  */
-function saveAttachment({ entityType, entityId, file, user, req }) {
-  assertEntityExists(entityType, entityId);
+async function saveAttachment({ entityType, entityId, file, user, req }) {
+  await assertEntityExists(entityType, entityId);
 
   const ext = path.extname(file.filename).slice(1).toLowerCase();
   if (!ALLOWED_EXTENSIONS.has(ext)) {
@@ -58,18 +58,18 @@ function saveAttachment({ entityType, entityId, file, user, req }) {
     throw badRequest(`Файл больше допустимых ${Math.round(config.maxUploadBytes / 1048576)} МБ`);
   }
 
-  const previous = get(
+  const previous = await get(
     `SELECT * FROM attachments WHERE entity_type = ? AND entity_id = ? AND orig_name = ? AND is_deleted = 0
      ORDER BY version DESC LIMIT 1`,
     entityType, entityId, file.filename
   );
   const version = previous ? previous.version + 1 : 1;
-  if (previous) run('UPDATE attachments SET is_current = 0 WHERE id = ?', previous.id);
+  if (previous) await run('UPDATE attachments SET is_current = 0 WHERE id = ?', previous.id);
 
   const storedName = `${Date.now()}_${crypto.randomBytes(8).toString('hex')}.${ext}`;
   fs.writeFileSync(path.join(config.uploadDir, storedName), file.data);
 
-  const result = run(
+  const result = await run(
     `INSERT INTO attachments (entity_type, entity_id, stored_name, orig_name, mime, size, version, is_current, uploaded_by)
      VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`,
     entityType, entityId, storedName, file.filename,
@@ -77,12 +77,12 @@ function saveAttachment({ entityType, entityId, file, user, req }) {
     file.data.length, version, user.id
   );
 
-  audit.record({
+  await audit.record({
     user, action: 'upload', entityType, entityId,
     summary: `Загружен файл «${file.filename}»${version > 1 ? ` (версия ${version})` : ''}`, req,
   });
-  touchActivity(entityType, entityId);
-  return get('SELECT * FROM attachments WHERE id = ?', Number(result.lastInsertRowid));
+  await touchActivity(entityType, entityId);
+  return await get('SELECT * FROM attachments WHERE id = ?', Number(result.lastInsertRowid));
 }
 
 const listAttachments = (entityType, entityId, { allVersions = false } = {}) =>
@@ -95,18 +95,18 @@ const listAttachments = (entityType, entityId, { allVersions = false } = {}) =>
     entityType, entityId
   );
 
-function deleteAttachment(id, user, req) {
-  const attachment = get('SELECT * FROM attachments WHERE id = ? AND is_deleted = 0', id);
+async function deleteAttachment(id, user, req) {
+  const attachment = await get('SELECT * FROM attachments WHERE id = ? AND is_deleted = 0', id);
   if (!attachment) throw notFound('Файл не найден');
-  run('UPDATE attachments SET is_deleted = 1 WHERE id = ?', id);
+  await run('UPDATE attachments SET is_deleted = 1 WHERE id = ?', id);
   // Предыдущая версия снова становится актуальной.
-  const prior = get(
+  const prior = await get(
     `SELECT id FROM attachments WHERE entity_type = ? AND entity_id = ? AND orig_name = ? AND is_deleted = 0
      ORDER BY version DESC LIMIT 1`,
     attachment.entity_type, attachment.entity_id, attachment.orig_name
   );
-  if (prior) run('UPDATE attachments SET is_current = 1 WHERE id = ?', prior.id);
-  audit.record({
+  if (prior) await run('UPDATE attachments SET is_current = 1 WHERE id = ?', prior.id);
+  await audit.record({
     user, action: 'delete', entityType: attachment.entity_type, entityId: attachment.entity_id,
     summary: `Удалён файл «${attachment.orig_name}» (версия ${attachment.version})`, req,
   });
@@ -114,10 +114,10 @@ function deleteAttachment(id, user, req) {
 }
 
 /** Разбирает упоминания вида @Фамилия и возвращает id найденных пользователей. */
-function parseMentions(body) {
+async function parseMentions(body) {
   const names = [...String(body).matchAll(/@([\p{L}][\p{L}\-.]{1,60})/gu)].map((m) => m[1]);
   if (!names.length) return [];
-  const users = all("SELECT id, full_name, email FROM users WHERE is_active = 1");
+  const users = await all("SELECT id, full_name, email FROM users WHERE is_active = 1");
   const matched = new Set();
   for (const name of names) {
     const lower = name.toLowerCase();
@@ -136,30 +136,30 @@ const ENTITY_TITLES = {
 };
 
 /** Добавляет комментарий (лента только на добавление, п. P-13 ТЗ). */
-function addComment({ entityType, entityId, body, user, req }) {
-  assertEntityExists(entityType, entityId);
+async function addComment({ entityType, entityId, body, user, req }) {
+  await assertEntityExists(entityType, entityId);
   const trimmed = String(body || '').trim();
   if (!trimmed) throw badRequest('Комментарий не может быть пустым');
   if (trimmed.length > 5000) throw badRequest('Комментарий длиннее 5000 символов');
 
-  const mentions = parseMentions(trimmed).filter((id) => id !== user.id);
-  const result = run(
+  const mentions = (await parseMentions(trimmed)).filter((id) => id !== user.id);
+  const result = await run(
     'INSERT INTO comments (entity_type, entity_id, user_id, body, mentions) VALUES (?, ?, ?, ?, ?)',
     entityType, entityId, user.id, trimmed, JSON.stringify(mentions)
   );
 
-  const info = ENTITY_TITLES[entityType]?.(entityId);
+  const info = await ENTITY_TITLES[entityType]?.(entityId);
   const label = info ? `${info.code ? `${info.code} — ` : ''}${info.title}` : '';
-  notify.notifyMany(mentions, {
+  await notify.notifyMany(mentions, {
     type: 'mention',
     title: `${user.full_name} упомянул(а) вас в комментарии`,
     body: `${label}\n\n${trimmed.slice(0, 400)}`,
     link: `/#/${entityType}s/${entityId}`,
   });
 
-  audit.record({ user, action: 'comment', entityType, entityId, summary: `Комментарий: ${trimmed.slice(0, 120)}`, req });
-  touchActivity(entityType, entityId);
-  return get(
+  await audit.record({ user, action: 'comment', entityType, entityId, summary: `Комментарий: ${trimmed.slice(0, 120)}`, req });
+  await touchActivity(entityType, entityId);
+  return await get(
     `SELECT c.*, u.full_name AS author_name, u.role AS author_role FROM comments c
      JOIN users u ON u.id = c.user_id WHERE c.id = ?`,
     Number(result.lastInsertRowid)
@@ -175,12 +175,12 @@ const listComments = (entityType, entityId) =>
   );
 
 /** Обновляет отметку последней активности проекта (для признака «замерших» проектов). */
-function touchActivity(entityType, entityId) {
+async function touchActivity(entityType, entityId) {
   if (entityType === 'project') {
-    run("UPDATE projects SET last_activity_at = datetime('now') WHERE id = ?", entityId);
+    await run("UPDATE projects SET last_activity_at = datetime('now') WHERE id = ?", entityId);
   } else if (entityType === 'step') {
-    const step = get('SELECT project_id FROM roadmap_steps WHERE id = ?', entityId);
-    if (step) run("UPDATE projects SET last_activity_at = datetime('now') WHERE id = ?", step.project_id);
+    const step = await get('SELECT project_id FROM roadmap_steps WHERE id = ?', entityId);
+    if (step) await run("UPDATE projects SET last_activity_at = datetime('now') WHERE id = ?", step.project_id);
   }
 }
 

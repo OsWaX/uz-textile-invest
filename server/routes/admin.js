@@ -23,7 +23,7 @@ const requireAdmin = (ctx, permission) => {
 // -------------------------------------------------------------------------
 router.get('/api/admin/users', async (ctx) => {
   requireAdmin(ctx, 'admin.users');
-  return all(
+  return await all(
     `SELECT u.id, u.email, u.full_name, u.position, u.role, u.region_id, u.phone, u.telegram_chat_id,
             u.language, u.is_active, u.totp_enabled, u.last_login_at, u.locked_until, u.failed_attempts,
             u.created_at, r.name_ru AS region_name,
@@ -35,7 +35,7 @@ router.get('/api/admin/users', async (ctx) => {
 router.post('/api/admin/users', async (ctx) => {
   const admin = requireAdmin(ctx, 'admin.users');
   const email = v.email(ctx.body.email, 'Электронная почта', { required: true });
-  if (get('SELECT id FROM users WHERE email = ?', email)) throw conflict('Пользователь с таким адресом уже существует');
+  if (await get('SELECT id FROM users WHERE lower(email) = lower(?)', email)) throw conflict('Пользователь с таким адресом уже существует');
 
   const password = String(ctx.body.password || '');
   const problem = auth.validatePassword(password);
@@ -43,10 +43,10 @@ router.post('/api/admin/users', async (ctx) => {
 
   const role = v.oneOf(ctx.body.role, 'Роль', rbac.ROLES);
   const regionId = v.int(ctx.body.region_id, 'Регион');
-  if (regionId && !get('SELECT id FROM regions WHERE id = ?', regionId)) throw badRequest('Регион не найден');
+  if (regionId && !(await get('SELECT id FROM regions WHERE id = ?', regionId))) throw badRequest('Регион не найден');
 
   const { salt, hash } = auth.hashPassword(password);
-  const result = run(
+  const result = await run(
     `INSERT INTO users (email, full_name, position, role, region_id, password_hash, password_salt,
        must_change_pwd, phone, telegram_chat_id, language, notify_email)
      VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`,
@@ -60,16 +60,16 @@ router.post('/api/admin/users', async (ctx) => {
     v.bool(ctx.body.notify_email, true) ? 1 : 0
   );
   const userId = Number(result.lastInsertRowid);
-  audit.record({
+  await audit.record({
     user: admin, action: 'user_manage', entityType: 'user', entityId: userId,
     summary: `Создан пользователь ${email} с ролью «${role}»`, req: ctx.req,
   });
-  return get('SELECT id, email, full_name, role, region_id, is_active FROM users WHERE id = ?', userId);
+  return await get('SELECT id, email, full_name, role, region_id, is_active FROM users WHERE id = ?', userId);
 });
 
 router.patch('/api/admin/users/:id', async (ctx) => {
   const admin = requireAdmin(ctx, 'admin.users');
-  const target = get('SELECT * FROM users WHERE id = ?', Number(ctx.params.id));
+  const target = await get('SELECT * FROM users WHERE id = ?', Number(ctx.params.id));
   if (!target) throw notFound('Пользователь не найден');
 
   const updates = {};
@@ -83,16 +83,16 @@ router.patch('/api/admin/users/:id', async (ctx) => {
 
   // Нельзя отключить последнего администратора.
   if ((updates.is_active === 0 || (updates.role && updates.role !== 'admin')) && target.role === 'admin') {
-    const admins = get("SELECT COUNT(*) AS n FROM users WHERE role = 'admin' AND is_active = 1")?.n ?? 0;
+    const admins = (await get("SELECT COUNT(*) AS n FROM users WHERE role = 'admin' AND is_active = 1"))?.n ?? 0;
     if (admins <= 1) throw conflict('В системе должен остаться хотя бы один активный администратор');
   }
   if (!Object.keys(updates).length) throw badRequest('Нет данных для изменения');
 
   const assignments = Object.keys(updates).map((key) => `${key} = ?`).join(', ');
-  run(`UPDATE users SET ${assignments}, updated_at = datetime('now') WHERE id = ?`, ...Object.values(updates), target.id);
-  if (updates.is_active === 0) run('UPDATE sessions SET revoked = 1 WHERE user_id = ?', target.id);
+  await run(`UPDATE users SET ${assignments}, updated_at = datetime('now') WHERE id = ?`, ...Object.values(updates), target.id);
+  if (updates.is_active === 0) await run('UPDATE sessions SET revoked = 1 WHERE user_id = ?', target.id);
 
-  audit.record({
+  await audit.record({
     user: admin, action: 'user_manage', entityType: 'user', entityId: target.id,
     summary: `Изменён пользователь ${target.email}`,
     changes: audit.diff(
@@ -101,42 +101,42 @@ router.patch('/api/admin/users/:id', async (ctx) => {
     ),
     req: ctx.req,
   });
-  return get('SELECT id, email, full_name, role, region_id, is_active FROM users WHERE id = ?', target.id);
+  return await get('SELECT id, email, full_name, role, region_id, is_active FROM users WHERE id = ?', target.id);
 });
 
 router.post('/api/admin/users/:id/reset-password', async (ctx) => {
   const admin = requireAdmin(ctx, 'admin.users');
-  const target = get('SELECT * FROM users WHERE id = ?', Number(ctx.params.id));
+  const target = await get('SELECT * FROM users WHERE id = ?', Number(ctx.params.id));
   if (!target) throw notFound('Пользователь не найден');
   const password = String(ctx.body.password || '');
   const problem = auth.validatePassword(password);
   if (problem) throw badRequest(problem);
 
   const { salt, hash } = auth.hashPassword(password);
-  run(
+  await run(
     "UPDATE users SET password_hash = ?, password_salt = ?, must_change_pwd = 1, failed_attempts = 0, locked_until = NULL WHERE id = ?",
     hash, salt, target.id
   );
-  run('UPDATE sessions SET revoked = 1 WHERE user_id = ?', target.id);
-  audit.record({ user: admin, action: 'user_manage', entityType: 'user', entityId: target.id, summary: `Сброшен пароль пользователя ${target.email}`, req: ctx.req });
+  await run('UPDATE sessions SET revoked = 1 WHERE user_id = ?', target.id);
+  await audit.record({ user: admin, action: 'user_manage', entityType: 'user', entityId: target.id, summary: `Сброшен пароль пользователя ${target.email}`, req: ctx.req });
   return { ok: true };
 });
 
 router.post('/api/admin/users/:id/reset-2fa', async (ctx) => {
   const admin = requireAdmin(ctx, 'admin.users');
-  const target = get('SELECT * FROM users WHERE id = ?', Number(ctx.params.id));
+  const target = await get('SELECT * FROM users WHERE id = ?', Number(ctx.params.id));
   if (!target) throw notFound('Пользователь не найден');
-  run('UPDATE users SET totp_enabled = 0, totp_secret = NULL WHERE id = ?', target.id);
-  audit.record({ user: admin, action: 'user_manage', entityType: 'user', entityId: target.id, summary: `Сброшена двухфакторная аутентификация: ${target.email}`, req: ctx.req });
+  await run('UPDATE users SET totp_enabled = 0, totp_secret = NULL WHERE id = ?', target.id);
+  await audit.record({ user: admin, action: 'user_manage', entityType: 'user', entityId: target.id, summary: `Сброшена двухфакторная аутентификация: ${target.email}`, req: ctx.req });
   return { ok: true };
 });
 
 router.post('/api/admin/users/:id/unlock', async (ctx) => {
   const admin = requireAdmin(ctx, 'admin.users');
-  const target = get('SELECT * FROM users WHERE id = ?', Number(ctx.params.id));
+  const target = await get('SELECT * FROM users WHERE id = ?', Number(ctx.params.id));
   if (!target) throw notFound('Пользователь не найден');
-  run('UPDATE users SET locked_until = NULL, failed_attempts = 0 WHERE id = ?', target.id);
-  audit.record({ user: admin, action: 'user_manage', entityType: 'user', entityId: target.id, summary: `Снята блокировка учётной записи ${target.email}`, req: ctx.req });
+  await run('UPDATE users SET locked_until = NULL, failed_attempts = 0 WHERE id = ?', target.id);
+  await audit.record({ user: admin, action: 'user_manage', entityType: 'user', entityId: target.id, summary: `Снята блокировка учётной записи ${target.email}`, req: ctx.req });
   return { ok: true };
 });
 
@@ -148,10 +148,10 @@ const DICT_KINDS = ['sector', 'record_type', 'project_status', 'visit_status', '
 router.get('/api/admin/dictionaries', async (ctx) => {
   requireAdmin(ctx, 'admin.dictionaries');
   const result = {};
-  for (const kind of DICT_KINDS) result[kind] = all('SELECT * FROM dictionaries WHERE kind = ? ORDER BY sort, id', kind);
-  result.regions = all('SELECT * FROM regions ORDER BY sort');
-  result.uz_regions = all('SELECT * FROM uz_regions ORDER BY sort, id');
-  result.countries = all(
+  for (const kind of DICT_KINDS) result[kind] = await all('SELECT * FROM dictionaries WHERE kind = ? ORDER BY sort, id', kind);
+  result.regions = await all('SELECT * FROM regions ORDER BY sort');
+  result.uz_regions = await all('SELECT * FROM uz_regions ORDER BY sort, id');
+  result.countries = await all(
     'SELECT c.*, r.name_ru AS region_name FROM countries c JOIN regions r ON r.id = c.region_id ORDER BY c.name_ru'
   );
   return result;
@@ -161,10 +161,10 @@ router.post('/api/admin/dictionaries', async (ctx) => {
   const admin = requireAdmin(ctx, 'admin.dictionaries');
   const kind = v.oneOf(ctx.body.kind, 'Справочник', DICT_KINDS);
   const code = v.str(ctx.body.code, 'Код', { required: true, max: 50 }).toLowerCase().replace(/[^a-z0-9_]/g, '_');
-  if (get('SELECT id FROM dictionaries WHERE kind = ? AND code = ?', kind, code)) throw conflict('Такой код уже существует в справочнике');
+  if (await get('SELECT id FROM dictionaries WHERE kind = ? AND code = ?', kind, code)) throw conflict('Такой код уже существует в справочнике');
 
-  const maxSort = get('SELECT COALESCE(MAX(sort), 0) AS n FROM dictionaries WHERE kind = ?', kind).n;
-  const result = run(
+  const maxSort = (await get('SELECT COALESCE(MAX(sort), 0) AS n FROM dictionaries WHERE kind = ?', kind)).n;
+  const result = await run(
     `INSERT INTO dictionaries (kind, code, name_ru, name_uz, name_en, color, sort) VALUES (?, ?, ?, ?, ?, ?, ?)`,
     kind, code,
     v.str(ctx.body.name_ru, 'Название (рус.)', { required: true, max: 200 }),
@@ -173,13 +173,13 @@ router.post('/api/admin/dictionaries', async (ctx) => {
     v.str(ctx.body.color, 'Цвет', { max: 20 }),
     maxSort + 1
   );
-  audit.record({ user: admin, action: 'settings', entityType: 'dictionary', entityId: Number(result.lastInsertRowid), summary: `Добавлено значение справочника «${kind}»: ${code}`, req: ctx.req });
-  return get('SELECT * FROM dictionaries WHERE id = ?', Number(result.lastInsertRowid));
+  await audit.record({ user: admin, action: 'settings', entityType: 'dictionary', entityId: Number(result.lastInsertRowid), summary: `Добавлено значение справочника «${kind}»: ${code}`, req: ctx.req });
+  return await get('SELECT * FROM dictionaries WHERE id = ?', Number(result.lastInsertRowid));
 });
 
 router.patch('/api/admin/dictionaries/:id', async (ctx) => {
   const admin = requireAdmin(ctx, 'admin.dictionaries');
-  const item = get('SELECT * FROM dictionaries WHERE id = ?', Number(ctx.params.id));
+  const item = await get('SELECT * FROM dictionaries WHERE id = ?', Number(ctx.params.id));
   if (!item) throw notFound('Значение справочника не найдено');
 
   const updates = {};
@@ -191,23 +191,23 @@ router.patch('/api/admin/dictionaries/:id', async (ctx) => {
   if (ctx.body.is_active !== undefined) {
     updates.is_active = v.bool(ctx.body.is_active) ? 1 : 0;
     if (!updates.is_active && item.is_system) {
-      const inUse = countUsage(item);
+      const inUse = await countUsage(item);
       if (inUse) throw conflict(`Значение используется в ${inUse} записях и не может быть отключено`);
     }
   }
   if (!Object.keys(updates).length) throw badRequest('Нет данных для изменения');
 
   const assignments = Object.keys(updates).map((key) => `${key} = ?`).join(', ');
-  run(`UPDATE dictionaries SET ${assignments} WHERE id = ?`, ...Object.values(updates), item.id);
-  audit.record({
+  await run(`UPDATE dictionaries SET ${assignments} WHERE id = ?`, ...Object.values(updates), item.id);
+  await audit.record({
     user: admin, action: 'settings', entityType: 'dictionary', entityId: item.id,
     summary: `Изменено значение справочника «${item.kind}»: ${item.code}`,
     changes: audit.diff(Object.fromEntries(Object.keys(updates).map((k) => [k, item[k]])), updates), req: ctx.req,
   });
-  return get('SELECT * FROM dictionaries WHERE id = ?', item.id);
+  return await get('SELECT * FROM dictionaries WHERE id = ?', item.id);
 });
 
-function countUsage(item) {
+async function countUsage(item) {
   const map = {
     sector: "SELECT COUNT(*) AS n FROM projects WHERE sector_code = ? AND is_deleted = 0",
     record_type: "SELECT COUNT(*) AS n FROM projects WHERE record_type = ? AND is_deleted = 0",
@@ -217,13 +217,13 @@ function countUsage(item) {
     currency: "SELECT COUNT(*) AS n FROM projects WHERE currency = ? AND is_deleted = 0",
   };
   const sql = map[item.kind];
-  return sql ? get(sql, item.code)?.n ?? 0 : 0;
+  return sql ? ((await get(sql, item.code))?.n ?? 0) : 0;
 }
 
 /** Правка справочника регионов Узбекистана (дополнение № 1 к ТЗ). */
 router.patch('/api/admin/uz-regions/:id', async (ctx) => {
   const admin = requireAdmin(ctx, 'admin.dictionaries');
-  const region = get('SELECT * FROM uz_regions WHERE id = ?', Number(ctx.params.id));
+  const region = await get('SELECT * FROM uz_regions WHERE id = ?', Number(ctx.params.id));
   if (!region) throw notFound('Регион не найден');
 
   const updates = {};
@@ -234,32 +234,32 @@ router.patch('/api/admin/uz-regions/:id', async (ctx) => {
   if (ctx.body.is_active !== undefined) {
     updates.is_active = v.bool(ctx.body.is_active) ? 1 : 0;
     if (!updates.is_active) {
-      const inUse = get('SELECT COUNT(*) AS n FROM project_locations WHERE uz_region_id = ?', region.id).n;
+      const inUse = (await get('SELECT COUNT(*) AS n FROM project_locations WHERE uz_region_id = ?', region.id)).n;
       if (inUse) throw conflict(`Регион указан в ${inUse} проектах и не может быть отключён`);
     }
   }
   if (!Object.keys(updates).length) throw badRequest('Нет данных для изменения');
 
   const assignments = Object.keys(updates).map((key) => `${key} = ?`).join(', ');
-  run(`UPDATE uz_regions SET ${assignments} WHERE id = ?`, ...Object.values(updates), region.id);
-  audit.record({
+  await run(`UPDATE uz_regions SET ${assignments} WHERE id = ?`, ...Object.values(updates), region.id);
+  await audit.record({
     user: admin, action: 'settings', entityType: 'dictionary', entityId: region.id,
     summary: `Изменён регион Узбекистана «${region.name_ru}»`,
     changes: audit.diff(Object.fromEntries(Object.keys(updates).map((k) => [k, region[k]])), updates), req: ctx.req,
   });
-  return get('SELECT * FROM uz_regions WHERE id = ?', region.id);
+  return await get('SELECT * FROM uz_regions WHERE id = ?', region.id);
 });
 
 /** Изменение привязки страны к региону (п. 9.2 ТЗ). */
 router.patch('/api/admin/countries/:id', async (ctx) => {
   const admin = requireAdmin(ctx, 'admin.dictionaries');
-  const country = get('SELECT * FROM countries WHERE id = ?', Number(ctx.params.id));
+  const country = await get('SELECT * FROM countries WHERE id = ?', Number(ctx.params.id));
   if (!country) throw notFound('Страна не найдена');
   const regionId = v.int(ctx.body.region_id, 'Регион', { required: true });
-  if (!get('SELECT id FROM regions WHERE id = ?', regionId)) throw badRequest('Регион не найден');
-  run('UPDATE countries SET region_id = ? WHERE id = ?', regionId, country.id);
-  audit.record({ user: admin, action: 'settings', entityType: 'dictionary', entityId: country.id, summary: `Страна «${country.name_ru}» переведена в другой регион`, req: ctx.req });
-  return get('SELECT * FROM countries WHERE id = ?', country.id);
+  if (!(await get('SELECT id FROM regions WHERE id = ?', regionId))) throw badRequest('Регион не найден');
+  await run('UPDATE countries SET region_id = ? WHERE id = ?', regionId, country.id);
+  await audit.record({ user: admin, action: 'settings', entityType: 'dictionary', entityId: country.id, summary: `Страна «${country.name_ru}» переведена в другой регион`, req: ctx.req });
+  return await get('SELECT * FROM countries WHERE id = ?', country.id);
 });
 
 // -------------------------------------------------------------------------
@@ -271,9 +271,9 @@ router.get('/api/admin/custom-fields', async (ctx) => {
     forms: cf.FORMS,
     types: cf.FIELD_TYPES,
     fields: {
-      project: cf.listFields('project', true),
-      visit: cf.listFields('visit', true),
-      company: cf.listFields('company', true),
+      project: await cf.listFields('project', true),
+      visit: await cf.listFields('visit', true),
+      company: await cf.listFields('company', true),
     },
   };
 });
@@ -286,7 +286,7 @@ router.post('/api/admin/custom-fields', async (ctx) => {
   const key = (v.str(ctx.body.field_key, 'Системное имя', { max: 60 }) || transliterate(labelRu))
     .toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/^_+|_+$/g, '').slice(0, 60) || `field_${Date.now()}`;
 
-  if (get('SELECT id FROM custom_fields WHERE form = ? AND field_key = ?', form, key)) {
+  if (await get('SELECT id FROM custom_fields WHERE form = ? AND field_key = ?', form, key)) {
     throw conflict('Поле с таким системным именем уже существует в этой форме');
   }
   const options = v.array(ctx.body.options, 'Варианты', { max: 50 }).map((o) => String(o).slice(0, 200));
@@ -294,8 +294,8 @@ router.post('/api/admin/custom-fields', async (ctx) => {
     throw badRequest('Для списков и голосований укажите не менее двух вариантов');
   }
 
-  const maxPosition = get('SELECT COALESCE(MAX(position), 0) AS n FROM custom_fields WHERE form = ?', form).n;
-  const result = run(
+  const maxPosition = (await get('SELECT COALESCE(MAX(position), 0) AS n FROM custom_fields WHERE form = ?', form)).n;
+  const result = await run(
     `INSERT INTO custom_fields (form, field_key, label_ru, label_uz, label_en, type, required, help_text,
        options_json, position, team_can_fill, created_by)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -309,16 +309,16 @@ router.post('/api/admin/custom-fields', async (ctx) => {
     v.bool(ctx.body.team_can_fill, true) ? 1 : 0,
     admin.id
   );
-  audit.record({
+  await audit.record({
     user: admin, action: 'settings', entityType: 'custom_field', entityId: Number(result.lastInsertRowid),
     summary: `Добавлено произвольное поле «${labelRu}» (${cf.FIELD_TYPES[type]}) в форму «${cf.FORMS[form]}»`, req: ctx.req,
   });
-  return get('SELECT * FROM custom_fields WHERE id = ?', Number(result.lastInsertRowid));
+  return await get('SELECT * FROM custom_fields WHERE id = ?', Number(result.lastInsertRowid));
 });
 
 router.patch('/api/admin/custom-fields/:id', async (ctx) => {
   const admin = requireAdmin(ctx, 'admin.custom_fields');
-  const field = get('SELECT * FROM custom_fields WHERE id = ?', Number(ctx.params.id));
+  const field = await get('SELECT * FROM custom_fields WHERE id = ?', Number(ctx.params.id));
   if (!field) throw notFound('Поле не найдено');
 
   const updates = {};
@@ -335,13 +335,13 @@ router.patch('/api/admin/custom-fields/:id', async (ctx) => {
   if (!Object.keys(updates).length) throw badRequest('Нет данных для изменения');
 
   const assignments = Object.keys(updates).map((key) => `${key} = ?`).join(', ');
-  run(`UPDATE custom_fields SET ${assignments} WHERE id = ?`, ...Object.values(updates), field.id);
-  audit.record({
+  await run(`UPDATE custom_fields SET ${assignments} WHERE id = ?`, ...Object.values(updates), field.id);
+  await audit.record({
     user: admin, action: 'settings', entityType: 'custom_field', entityId: field.id,
     summary: `Изменено произвольное поле «${field.label_ru}»`,
     changes: audit.diff(Object.fromEntries(Object.keys(updates).map((k) => [k, field[k]])), updates), req: ctx.req,
   });
-  return get('SELECT * FROM custom_fields WHERE id = ?', field.id);
+  return await get('SELECT * FROM custom_fields WHERE id = ?', field.id);
 });
 
 const TRANSLIT = {
@@ -376,7 +376,7 @@ router.get('/api/admin/settings', async (ctx) => {
   // Если строки в базе нет, отдаём значение по умолчанию, а не null:
   // иначе форма покажет нули и сохранит их поверх рабочих настроек.
   const values = {};
-  for (const key of Object.keys(EDITABLE_SETTINGS)) values[key] = getSetting(key, DEFAULT_SETTINGS[key] ?? null);
+  for (const key of Object.keys(EDITABLE_SETTINGS)) values[key] = await getSetting(key, DEFAULT_SETTINGS[key] ?? null);
   return {
     labels: EDITABLE_SETTINGS,
     values,
@@ -393,12 +393,12 @@ router.patch('/api/admin/settings', async (ctx) => {
   const changes = [];
   for (const [key, value] of Object.entries(ctx.body || {})) {
     if (!Object.prototype.hasOwnProperty.call(EDITABLE_SETTINGS, key)) continue;
-    const before = getSetting(key, null);
-    setSetting(key, value, admin.id);
+    const before = await getSetting(key, null);
+    await setSetting(key, value, admin.id);
     changes.push({ field: key, label: EDITABLE_SETTINGS[key], from: before, to: value });
   }
   if (!changes.length) throw badRequest('Не передано ни одной известной настройки');
-  audit.record({ user: admin, action: 'settings', entityType: 'settings', summary: 'Изменены настройки системы', changes, req: ctx.req });
+  await audit.record({ user: admin, action: 'settings', entityType: 'settings', summary: 'Изменены настройки системы', changes, req: ctx.req });
   return { ok: true, changed: changes.length };
 });
 
@@ -407,7 +407,7 @@ router.patch('/api/admin/settings', async (ctx) => {
 // -------------------------------------------------------------------------
 router.get('/api/admin/audit', async (ctx) => {
   requireAdmin(ctx, 'admin.audit');
-  const result = audit.query({
+  const result = await audit.query({
     userId: ctx.query.user_id, action: ctx.query.action, entityType: ctx.query.entity_type,
     entityId: ctx.query.entity_id, from: ctx.query.from, to: ctx.query.to, search: ctx.query.search,
     limit: ctx.query.limit || 100, offset: ctx.query.offset || 0,
@@ -428,14 +428,14 @@ const BINS = {
 
 router.get('/api/admin/recycle-bin', async (ctx) => {
   requireAdmin(ctx, 'admin.recycle_bin');
-  const retention = Number(getSetting('recycle_bin.retention_days', 30));
+  const retention = Number(await getSetting('recycle_bin.retention_days', 30));
   const result = {};
   for (const [type, meta] of Object.entries(BINS)) {
     result[type] = {
       label: meta.label,
-      rows: all(
+      rows: await all(
         `SELECT id, ${meta.title} AS title, deleted_at,
-                CAST(julianday(deleted_at, '+${retention} day') - julianday('now') AS INTEGER) AS days_left
+                ((CAST(deleted_at AS date) + ${retention}) - current_date) AS days_left
          FROM ${meta.table} WHERE is_deleted = 1 ORDER BY deleted_at DESC LIMIT 200`
       ),
     };
@@ -447,10 +447,10 @@ router.post('/api/admin/recycle-bin/:type/:id/restore', async (ctx) => {
   const admin = requireAdmin(ctx, 'admin.recycle_bin');
   const meta = BINS[ctx.params.type];
   if (!meta) throw badRequest('Неизвестный тип записи');
-  const row = get(`SELECT * FROM ${meta.table} WHERE id = ? AND is_deleted = 1`, Number(ctx.params.id));
+  const row = await get(`SELECT * FROM ${meta.table} WHERE id = ? AND is_deleted = 1`, Number(ctx.params.id));
   if (!row) throw notFound('Запись не найдена в корзине');
-  run(`UPDATE ${meta.table} SET is_deleted = 0, deleted_at = NULL WHERE id = ?`, row.id);
-  audit.record({ user: admin, action: 'restore', entityType: ctx.params.type, entityId: row.id, summary: `Восстановлена запись из корзины (${meta.label})`, req: ctx.req });
+  await run(`UPDATE ${meta.table} SET is_deleted = 0, deleted_at = NULL WHERE id = ?`, row.id);
+  await audit.record({ user: admin, action: 'restore', entityType: ctx.params.type, entityId: row.id, summary: `Восстановлена запись из корзины (${meta.label})`, req: ctx.req });
   return { ok: true };
 });
 
@@ -458,14 +458,14 @@ router.delete('/api/admin/recycle-bin/:type/:id', async (ctx) => {
   const admin = requireAdmin(ctx, 'admin.recycle_bin');
   const meta = BINS[ctx.params.type];
   if (!meta) throw badRequest('Неизвестный тип записи');
-  const row = get(`SELECT * FROM ${meta.table} WHERE id = ? AND is_deleted = 1`, Number(ctx.params.id));
+  const row = await get(`SELECT * FROM ${meta.table} WHERE id = ? AND is_deleted = 1`, Number(ctx.params.id));
   if (!row) throw notFound('Запись не найдена в корзине');
-  transaction(() => {
-    run(`DELETE FROM ${meta.table} WHERE id = ?`, row.id);
-    run('DELETE FROM attachments WHERE entity_type = ? AND entity_id = ?', ctx.params.type, row.id);
-    run('DELETE FROM comments WHERE entity_type = ? AND entity_id = ?', ctx.params.type, row.id);
+  await transaction(async () => {
+    await run(`DELETE FROM ${meta.table} WHERE id = ?`, row.id);
+    await run('DELETE FROM attachments WHERE entity_type = ? AND entity_id = ?', ctx.params.type, row.id);
+    await run('DELETE FROM comments WHERE entity_type = ? AND entity_id = ?', ctx.params.type, row.id);
   });
-  audit.record({ user: admin, action: 'delete', entityType: ctx.params.type, entityId: row.id, summary: `Запись удалена окончательно (${meta.label})`, req: ctx.req });
+  await audit.record({ user: admin, action: 'delete', entityType: ctx.params.type, entityId: row.id, summary: `Запись удалена окончательно (${meta.label})`, req: ctx.req });
   return { ok: true };
 });
 

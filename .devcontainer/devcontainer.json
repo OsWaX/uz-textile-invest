@@ -4,15 +4,17 @@
 
   "containerEnv": {
     "TZ": "Asia/Tashkent",
-    "PORT": "3000"
+    "PORT": "3000",
+    "DATABASE_URL": "postgres://portal:portal@127.0.0.1:5432/uz_textile_portal",
+    "SESSION_SECRET": "codespaces-dev-secret-key-for-local-demo-0123456789",
+    "ADMIN_PASSWORD": "Parol2026!"
   },
 
-  // Внешних зависимостей нет — только создаём базу с демонстрационными данными.
-  "postCreateCommand": "node --version && npm run seed",
+  "postCreateCommand": "node --version && sudo apt-get update && sudo apt-get install -y postgresql postgresql-client && sudo service postgresql start && sudo -u postgres psql -tc \"SELECT 1 FROM pg_roles WHERE rolname='portal'\" | grep -q 1 || sudo -u postgres psql -c \"CREATE USER portal WITH PASSWORD 'portal'\"; sudo -u postgres psql -tc \"SELECT 1 FROM pg_database WHERE datname='uz_textile_portal'\" | grep -q 1 || sudo -u postgres createdb -O portal uz_textile_portal; npm install && npm run seed",
 
   // Портал запускается сам при открытии среды разработки.
   "postAttachCommand": {
-    "Портал": "npm start"
+    "Портал": "sudo service postgresql start && npm start"
   },
 
   "forwardPorts": [3000],

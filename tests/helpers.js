@@ -5,8 +5,14 @@ const os = require('node:os');
 const path = require('node:path');
 
 const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'po-test-'));
+const testDatabaseUrl = process.env.TEST_DATABASE_URL || 'postgres://portal:portal@127.0.0.1:5432/uz_textile_portal_test';
+
+if (!/test/i.test(new URL(testDatabaseUrl).pathname)) {
+  throw new Error('TEST_DATABASE_URL должен указывать на отдельную тестовую базу PostgreSQL');
+}
+
 process.env.NODE_ENV = 'test';
-process.env.DB_PATH = path.join(workDir, 'test.db');
+process.env.DATABASE_URL = testDatabaseUrl;
 process.env.UPLOAD_DIR = path.join(workDir, 'uploads');
 process.env.SESSION_SECRET = 'test-secret-key-for-acceptance-tests-0123456789';
 process.env.ADMIN_EMAIL = 'admin@textile.gov.uz';
@@ -14,11 +20,27 @@ process.env.ADMIN_PASSWORD = 'Parol2026!';
 process.env.PORT = '0';
 
 const app = require('../server/index');
+const db = require('../server/db');
 
 let baseUrl = '';
 
+const TABLES = [
+  'notification_deliveries', 'notifications', 'poll_votes', 'custom_values',
+  'custom_fields', 'correction_requests', 'comments', 'attachments', 'contacts',
+  'meetings', 'visit_members', 'visits', 'roadmap_steps',
+  'project_status_history', 'project_locations', 'project_partners', 'projects',
+  'companies', 'sessions', 'users', 'saved_filters', 'audit_log', 'settings',
+  'dictionaries', 'countries', 'regions', 'uz_regions',
+];
+
+async function resetDatabase() {
+  await db.init();
+  await db.exec(`TRUNCATE TABLE ${TABLES.join(', ')} RESTART IDENTITY CASCADE`);
+}
+
 async function startServer() {
-  app.bootstrap();
+  await resetDatabase();
+  await app.bootstrap();
   await new Promise((resolve) => app.server.listen(0, '127.0.0.1', resolve));
   baseUrl = `http://127.0.0.1:${app.server.address().port}`;
   return baseUrl;

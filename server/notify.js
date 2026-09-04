@@ -30,13 +30,13 @@ const TYPE_LABELS = {
  * Создаёт уведомление и отправляет его по выбранным пользователем каналам.
  * dedupeKey защищает от повторной отправки одного и того же напоминания.
  */
-function notify({ userId, type, title, body = '', link = '', severity = 'info', dedupeKey = '' }) {
-  const user = get('SELECT * FROM users WHERE id = ? AND is_active = 1', userId);
+async function notify({ userId, type, title, body = '', link = '', severity = 'info', dedupeKey = '' }) {
+  const user = await get('SELECT * FROM users WHERE id = ? AND is_active = 1', userId);
   if (!user) return null;
 
-  if (dedupeKey && get('SELECT id FROM notifications WHERE dedupe_key = ?', dedupeKey)) return null;
+  if (dedupeKey && await get('SELECT id FROM notifications WHERE dedupe_key = ?', dedupeKey)) return null;
 
-  const result = run(
+  const result = await run(
     `INSERT INTO notifications (user_id, type, title, body, link, severity, dedupe_key)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
     userId, type, title, body, link, severity, dedupeKey
@@ -44,7 +44,7 @@ function notify({ userId, type, title, body = '', link = '', severity = 'info', 
   const notificationId = Number(result.lastInsertRowid);
 
   if (user.notify_email && config.smtp.enabled) {
-    deliver(notificationId, 'email', () =>
+    void deliver(notificationId, 'email', () =>
       sendMail(config.smtp, {
         to: user.email,
         subject: title,
@@ -58,7 +58,7 @@ function notify({ userId, type, title, body = '', link = '', severity = 'info', 
     const text =
       `<b>${escapeHtml(title)}</b>\n${escapeHtml(body)}` +
       (link ? `\n\n${escapeHtml(config.publicUrl + link)}` : '');
-    deliver(notificationId, 'telegram', () =>
+    void deliver(notificationId, 'telegram', () =>
       sendTelegramMessage(config.telegram.token, user.telegram_chat_id, text)
     );
   }
@@ -67,17 +67,17 @@ function notify({ userId, type, title, body = '', link = '', severity = 'info', 
 }
 
 /** Внешние каналы отправляются асинхронно; результат фиксируется в журнале доставки. */
-function deliver(notificationId, channel, sendFn) {
+async function deliver(notificationId, channel, sendFn) {
   Promise.resolve()
     .then(sendFn)
-    .then(() => {
-      run(
+    .then(async () => {
+      await run(
         'INSERT INTO notification_deliveries (notification_id, channel, status) VALUES (?, ?, ?)',
         notificationId, channel, 'sent'
       );
     })
-    .catch((error) => {
-      run(
+    .catch(async (error) => {
+      await run(
         'INSERT INTO notification_deliveries (notification_id, channel, status, error) VALUES (?, ?, ?, ?)',
         notificationId, channel, 'failed', String(error?.message || error).slice(0, 500)
       );
@@ -103,33 +103,33 @@ function emailTemplate({ title, body, link }) {
 }
 
 /** Уведомить нескольких пользователей (дубликаты по id отбрасываются). */
-function notifyMany(userIds, payload) {
+async function notifyMany(userIds, payload) {
   const unique = [...new Set(userIds.filter(Boolean))];
   for (const userId of unique) {
-    notify({ ...payload, userId, dedupeKey: payload.dedupeKey ? `${payload.dedupeKey}:${userId}` : '' });
+    await notify({ ...payload, userId, dedupeKey: payload.dedupeKey ? `${payload.dedupeKey}:${userId}` : '' });
   }
 }
 
-const adminIds = () => all("SELECT id FROM users WHERE role = 'admin' AND is_active = 1").map((r) => r.id);
+const adminIds = async () => (await all("SELECT id FROM users WHERE role = 'admin' AND is_active = 1")).map((r) => r.id);
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 const shiftDays = (days) => new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
 
 /** Напоминания о приближающихся сроках этапов дорожной карты. */
-function runDeadlineReminders() {
-  const daysBefore = getSetting('reminders.days_before', [7, 3, 1]);
+async function runDeadlineReminders() {
+  const daysBefore = await getSetting('reminders.days_before', [7, 3, 1]);
   let created = 0;
 
   for (const days of daysBefore) {
     const target = shiftDays(days);
-    const steps = all(
+    const steps = await all(
       `SELECT s.*, p.title AS project_title, p.code AS project_code
        FROM roadmap_steps s JOIN projects p ON p.id = s.project_id
        WHERE s.is_deleted = 0 AND p.is_deleted = 0 AND s.state <> 'done' AND s.due_date = ?`,
       target
     );
     for (const step of steps) {
-      const id = notify({
+      const id = await notify({
         userId: step.responsible_user_id,
         type: 'deadline_soon',
         title: `Через ${days} ${days === 1 ? 'день' : 'дн.'}: ${step.title}`,
@@ -145,10 +145,10 @@ function runDeadlineReminders() {
 }
 
 /** Просроченные этапы: уведомление ответственному и эскалация руководству. */
-function runOverdueChecks() {
+async function runOverdueChecks() {
   const today = todayIso();
-  const escalate = getSetting('reminders.escalate_overdue', true);
-  const overdue = all(
+  const escalate = await getSetting('reminders.escalate_overdue', true);
+  const overdue = await all(
     `SELECT s.*, p.title AS project_title, p.code AS project_code, p.responsible_user_id AS project_owner
      FROM roadmap_steps s JOIN projects p ON p.id = s.project_id
      WHERE s.is_deleted = 0 AND p.is_deleted = 0 AND s.state <> 'done'
@@ -160,7 +160,7 @@ function runOverdueChecks() {
   for (const step of overdue) {
     const dedupe = `step:${step.id}:overdue:${today}`;
     const body = `Проект ${step.project_code} — «${step.project_title}».\nСрок истёк ${formatDate(step.due_date)}.`;
-    if (notify({
+    if (await notify({
       userId: step.responsible_user_id,
       type: 'deadline_overdue',
       title: `Просрочен этап: ${step.title}`,
@@ -171,10 +171,10 @@ function runOverdueChecks() {
     })) created += 1;
 
     if (escalate) {
-      notifyMany(adminIds().filter((id) => id !== step.responsible_user_id), {
+      await notifyMany((await adminIds()).filter((id) => id !== step.responsible_user_id), {
         type: 'deadline_escalation',
         title: `Эскалация: просрочен этап «${step.title}»`,
-        body: `${body}\nОтветственный: ${userName(step.responsible_user_id)}.`,
+        body: `${body}\nОтветственный: ${await userName(step.responsible_user_id)}.`,
         link: `/#/projects/${step.project_id}`,
         severity: 'danger',
         dedupeKey: `step:${step.id}:escalation:${today}`,
@@ -185,10 +185,10 @@ function runOverdueChecks() {
 }
 
 /** Проекты без активности дольше порогового значения. */
-function runStaleChecks() {
-  const staleDays = Number(getSetting('projects.stale_days', 30));
+async function runStaleChecks() {
+  const staleDays = Number(await getSetting('projects.stale_days', 30));
   const threshold = new Date(Date.now() - staleDays * 86400000).toISOString().slice(0, 19).replace('T', ' ');
-  const stale = all(
+  const stale = await all(
     `SELECT id, code, title, responsible_user_id, last_activity_at FROM projects
      WHERE is_deleted = 0 AND status_code NOT IN ('completed','cancelled') AND last_activity_at < ?`,
     threshold
@@ -196,7 +196,7 @@ function runStaleChecks() {
   let created = 0;
   const week = `${new Date().getFullYear()}-w${Math.ceil(new Date().getDate() / 7)}-${new Date().getMonth()}`;
   for (const project of stale) {
-    if (notify({
+    if (await notify({
       userId: project.responsible_user_id,
       type: 'stale_project',
       title: `Нет активности по проекту ${project.code}`,
@@ -210,8 +210,8 @@ function runStaleChecks() {
 }
 
 /** Еженедельная сводка: сроки недели, встречи, «замершие» проекты. */
-function runWeeklyDigest() {
-  const users = all("SELECT * FROM users WHERE is_active = 1 AND role IN ('admin','team')");
+async function runWeeklyDigest() {
+  const users = await all("SELECT * FROM users WHERE is_active = 1 AND role IN ('admin','team')");
   const weekEnd = shiftDays(7);
   const today = todayIso();
   let sent = 0;
@@ -220,13 +220,13 @@ function runWeeklyDigest() {
     const isAdmin = user.role === 'admin';
     const scope = isAdmin ? '' : 'AND s.responsible_user_id = ?';
     const params = isAdmin ? [today, weekEnd] : [today, weekEnd, user.id];
-    const steps = all(
+    const steps = await all(
       `SELECT s.title, s.due_date, p.code FROM roadmap_steps s JOIN projects p ON p.id = s.project_id
        WHERE s.is_deleted = 0 AND p.is_deleted = 0 AND s.state <> 'done'
          AND s.due_date BETWEEN ? AND ? ${scope} ORDER BY s.due_date`,
       ...params
     );
-    const meetings = all(
+    const meetings = await all(
       `SELECT m.meet_date, m.company_name, v.code FROM meetings m JOIN visits v ON v.id = m.visit_id
        WHERE m.is_deleted = 0 AND v.is_deleted = 0 AND m.meet_date BETWEEN ? AND ?
          ${isAdmin ? '' : 'AND v.responsible_user_id = ?'} ORDER BY m.meet_date`,
@@ -245,7 +245,7 @@ function runWeeklyDigest() {
       for (const m of meetings) lines.push(`  • ${formatDate(m.meet_date)} — ${m.company_name} (${m.code})`);
     }
 
-    if (notify({
+    if (await notify({
       userId: user.id,
       type: 'digest',
       title: isAdmin ? 'Сводка по офису на неделю' : 'Ваша сводка на неделю',
@@ -264,28 +264,28 @@ function formatDate(value) {
   return `${d}.${m}.${y}`;
 }
 
-function userName(userId) {
-  return get('SELECT full_name FROM users WHERE id = ?', userId)?.full_name || 'не назначен';
+async function userName(userId) {
+  return (await get('SELECT full_name FROM users WHERE id = ?', userId))?.full_name || 'не назначен';
 }
 
 /** Ежечасный планировщик: напоминания, эскалации, дайджест. */
 let timer = null;
 function startScheduler() {
-  const tick = () => {
+  const tick = async () => {
     try {
       const now = new Date(Date.now() + config.displayOffsetMinutes * 60000); // время Ташкента
-      runDeadlineReminders();
-      runOverdueChecks();
-      if (now.getUTCHours() === Number(getSetting('reminders.digest_hour', 8))) {
-        if (now.getUTCDay() === Number(getSetting('reminders.digest_weekday', 1))) runWeeklyDigest();
-        runStaleChecks();
+      await runDeadlineReminders();
+      await runOverdueChecks();
+      if (now.getUTCHours() === Number(await getSetting('reminders.digest_hour', 8))) {
+        if (now.getUTCDay() === Number(await getSetting('reminders.digest_weekday', 1))) await runWeeklyDigest();
+        await runStaleChecks();
       }
     } catch (error) {
       console.error('[планировщик] ошибка:', error.message);
     }
   };
-  tick();
-  timer = setInterval(tick, 3600 * 1000);
+  void tick();
+  timer = setInterval(() => { void tick(); }, 3600 * 1000);
   timer.unref?.();
   return timer;
 }

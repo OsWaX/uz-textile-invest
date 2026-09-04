@@ -14,8 +14,10 @@
     "seed": "node --no-warnings=ExperimentalWarning scripts/seed.js",
     "reset": "node --no-warnings=ExperimentalWarning scripts/seed.js --reset",
     "clean": "node --no-warnings=ExperimentalWarning scripts/clean.js",
-    "test": "node --no-warnings=ExperimentalWarning --test tests/*.test.js"
+    "test": "node --no-warnings=ExperimentalWarning --test --test-concurrency=1 tests/*.test.js"
   },
-  "dependencies": {},
+  "dependencies": {
+    "pg": "8.13.1"
+  },
   "license": "UNLICENSED"
 }

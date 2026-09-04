@@ -20,6 +20,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const readline = require('node:readline');
+const { execFileSync } = require('node:child_process');
 
 const config = require('../server/config');
 const { db, get, run, pluck, transaction } = require('../server/db');
@@ -60,55 +61,39 @@ const DATA_TABLES = [
   'projects', 'companies', 'sessions',
 ];
 
-const count = (table, where = '') => pluck(`SELECT COUNT(*) FROM ${table} ${where}`) || 0;
-
-const summary = [
-  ['Проекты и соглашения', count('projects')],
-  ['Этапы дорожных карт', count('roadmap_steps')],
-  ['Компании и организации', count('companies')],
-  ['Контактные лица', count('contacts')],
-  ['Визиты', count('visits')],
-  ['Встречи', count('meetings')],
-  ['Комментарии', count('comments')],
-  ['Вложенные файлы', count('attachments')],
-  ['Уведомления', count('notifications')],
-  ['Записи журнала аудита', count('audit_log')],
-  ['Активные сессии', count('sessions')],
-];
-if (wipeFields) summary.push(['Поля конструктора форм', count('custom_fields')]);
-if (wipeUsers) summary.push(['Учётные записи (кроме одной)', Math.max(0, count('users') - 1)]);
-
-const total = summary.reduce((sum, [, value]) => sum + value, 0);
-
-console.log('\n  Будут безвозвратно удалены:');
-for (const [label, value] of summary) {
-  console.log(`     ${String(value).padStart(6)}  ${label}`);
-}
-console.log('\n  Сохраняются: структура базы, справочники и настройки системы.');
-if (!wipeUsers) console.log('  Сохраняются: учётные записи пользователей (используйте --users, чтобы удалить и их).');
-if (!wipeFields) console.log('  Сохраняются: поля конструктора форм (используйте --fields, чтобы удалить и их).');
-console.log(`  База данных: ${config.dbPath}\n`);
-
-if (total === 0 && !wipeUsers && !wipeFields) {
-  console.log('  Удалять нечего — рабочих данных в системе нет.\n');
-  process.exit(0);
-}
-
 main().catch((error) => {
   console.error(`\n  Ошибка очистки: ${error.message}\n`);
-  process.exit(1);
-});
+  process.exitCode = 1;
+}).finally(() => db.close());
 
 async function main() {
+  await reference.ensureReference();
+
+  const summary = await buildSummary();
+  const total = summary.reduce((sum, [, value]) => sum + value, 0);
+
+  console.log('\n  Будут безвозвратно удалены:');
+  for (const [label, value] of summary) {
+    console.log(`     ${String(value).padStart(6)}  ${label}`);
+  }
+  console.log('\n  Сохраняются: структура базы, справочники и настройки системы.');
+  if (!wipeUsers) console.log('  Сохраняются: учётные записи пользователей (используйте --users, чтобы удалить и их).');
+  if (!wipeFields) console.log('  Сохраняются: поля конструктора форм (используйте --fields, чтобы удалить и их).');
+  console.log(`  База данных: ${databaseLabel()}\n`);
+
+  if (total === 0 && !wipeUsers && !wipeFields) {
+    console.log('  Удалять нечего — рабочих данных в системе нет.\n');
+    return;
+  }
+
   if (!assumeYes) {
     if (!process.stdin.isTTY) {
-      console.error('  Запуск без интерактивного терминала. Добавьте --yes для подтверждения.\n');
-      process.exit(1);
+      throw new Error('Запуск без интерактивного терминала. Добавьте --yes для подтверждения.');
     }
     const answer = await ask(`  Введите ${CONFIRM_WORD} для подтверждения: `);
     if (answer.trim().toUpperCase() !== CONFIRM_WORD) {
       console.log('\n  Отменено. Ничего не удалено.\n');
-      process.exit(0);
+      return;
     }
   }
 
@@ -118,25 +103,32 @@ async function main() {
   }
 
   const files = removeUploads();
-  const keptAdmin = wipeUsers ? chooseAdminToKeep() : null;
+  const keptAdmin = wipeUsers ? await chooseAdminToKeep() : null;
 
-  db.exec('PRAGMA foreign_keys = OFF');
-  transaction(() => {
-    for (const table of DATA_TABLES) run(`DELETE FROM ${table}`);
-    if (wipeFields) run('DELETE FROM custom_fields');
-    if (keptAdmin) {
-      run('DELETE FROM users WHERE id <> ?', keptAdmin.id);
-      run('UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = ?', keptAdmin.id);
+  await transaction(async () => {
+    for (const table of DATA_TABLES) await run(`DELETE FROM ${table}`);
+    if (wipeFields) await run('DELETE FROM custom_fields');
+    if (wipeUsers) {
+      if (!wipeFields) await run('UPDATE custom_fields SET created_by = NULL');
+      if (keptAdmin) {
+        await run('DELETE FROM users WHERE id <> ?', keptAdmin.id);
+        await run('UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = ?', keptAdmin.id);
+      } else {
+        await run('DELETE FROM users');
+      }
     }
   });
-  db.exec('PRAGMA foreign_keys = ON');
 
   // Справочники и настройки восстанавливаются, если чего-то не хватает.
-  reference.ensureReference();
+  await reference.ensureReference();
 
-  const newPassword = keptAdmin ? resetDemoPassword(keptAdmin) : null;
+  const newPassword = keptAdmin ? await resetDemoPassword(keptAdmin) : null;
 
-  db.exec('VACUUM');
+  try {
+    await db.exec('VACUUM');
+  } catch (error) {
+    console.warn(`  VACUUM не выполнен: ${error.message}`);
+  }
 
   console.log('\n  Готово. Рабочие данные удалены.');
   if (files) console.log(`  Удалено загруженных файлов: ${files}`);
@@ -154,6 +146,26 @@ async function main() {
   console.log('  Нумерация проектов и визитов начнётся заново с 0001.\n');
 }
 
+async function buildSummary() {
+  const count = async (table, where = '') => Number(await pluck(`SELECT COUNT(*) FROM ${table} ${where}`)) || 0;
+  const rows = [
+    ['Проекты и соглашения', await count('projects')],
+    ['Этапы дорожных карт', await count('roadmap_steps')],
+    ['Компании и организации', await count('companies')],
+    ['Контактные лица', await count('contacts')],
+    ['Визиты', await count('visits')],
+    ['Встречи', await count('meetings')],
+    ['Комментарии', await count('comments')],
+    ['Вложенные файлы', await count('attachments')],
+    ['Уведомления', await count('notifications')],
+    ['Записи журнала аудита', await count('audit_log')],
+    ['Активные сессии', await count('sessions')],
+  ];
+  if (wipeFields) rows.push(['Поля конструктора форм', await count('custom_fields')]);
+  if (wipeUsers) rows.push(['Учётные записи (кроме одной)', Math.max(0, (await count('users')) - 1)]);
+  return rows;
+}
+
 function ask(question) {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   return new Promise((resolve) => rl.question(question, (answer) => { rl.close(); resolve(answer); }));
@@ -161,12 +173,14 @@ function ask(question) {
 
 function backupDatabase() {
   const stamp = new Date().toISOString().replace(/[-:]/g, '').slice(0, 15);
-  const target = path.join(path.dirname(config.dbPath), `portal-backup-${stamp}.db`);
+  const backupDir = path.resolve(process.env.BACKUP_DIR || path.join(config.root, 'backups'));
+  fs.mkdirSync(backupDir, { recursive: true });
+  const target = path.join(backupDir, `portal-backup-${stamp}.dump`);
+
   try {
-    db.exec(`VACUUM INTO '${target.replace(/'/g, "''")}'`);
-  } catch {
-    db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
-    fs.copyFileSync(config.dbPath, target);
+    execFileSync('pg_dump', ['--dbname', config.databaseUrl, '--format=custom', '--file', target], { stdio: 'pipe' });
+  } catch (error) {
+    throw new Error(`Не удалось создать backup через pg_dump: ${error.message}. Установите postgresql-client или запустите с --no-backup.`);
   }
   return target;
 }
@@ -191,25 +205,28 @@ function removeUploads() {
   return removed;
 }
 
-function chooseAdminToKeep() {
-  const admin =
-    get("SELECT * FROM users WHERE role = 'admin' AND is_active = 1 AND email = ?", config.bootstrapAdmin.email)
-    || get("SELECT * FROM users WHERE role = 'admin' AND is_active = 1 ORDER BY id LIMIT 1")
-    || get("SELECT * FROM users WHERE role = 'admin' ORDER BY id LIMIT 1");
-  if (!admin) {
-    // Администраторов нет — учётная запись будет создана заново при запуске сервера.
-    run('DELETE FROM users');
-    return null;
-  }
-  return admin;
+async function chooseAdminToKeep() {
+  return await get("SELECT * FROM users WHERE role = 'admin' AND is_active = 1 AND lower(email) = lower(?)", config.bootstrapAdmin.email)
+    || await get("SELECT * FROM users WHERE role = 'admin' AND is_active = 1 ORDER BY id LIMIT 1")
+    || await get("SELECT * FROM users WHERE role = 'admin' ORDER BY id LIMIT 1");
 }
 
 // Учётная запись из демонстрационного набора не должна остаться в рабочей системе
 // с паролем, опубликованным в репозитории.
-function resetDemoPassword(admin) {
+async function resetDemoPassword(admin) {
   if (!auth.verifyPassword(DEMO_PASSWORD, admin.password_salt, admin.password_hash)) return null;
   const password = config.bootstrapAdmin.password || crypto.randomBytes(9).toString('base64url');
   const { salt, hash } = auth.hashPassword(password);
-  run('UPDATE users SET password_hash = ?, password_salt = ?, must_change_pwd = 1 WHERE id = ?', hash, salt, admin.id);
+  await run('UPDATE users SET password_hash = ?, password_salt = ?, must_change_pwd = 1 WHERE id = ?', hash, salt, admin.id);
   return password;
+}
+
+function databaseLabel() {
+  try {
+    const url = new URL(config.databaseUrl);
+    if (url.password) url.password = '***';
+    return url.toString();
+  } catch {
+    return 'PostgreSQL DATABASE_URL';
+  }
 }

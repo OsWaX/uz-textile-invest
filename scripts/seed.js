@@ -21,22 +21,26 @@ const TABLES = [
   'roadmap_steps', 'project_status_history', 'projects', 'companies', 'sessions', 'users',
 ];
 
+main().catch((error) => {
+  console.error(`Ошибка наполнения базы: ${error.message}`);
+  process.exitCode = 1;
+}).finally(() => db.close());
+
+async function main() {
 if (reset) {
-  db.exec('PRAGMA foreign_keys = OFF');
-  transaction(() => { for (const table of TABLES) run(`DELETE FROM ${table}`); });
-  db.exec('PRAGMA foreign_keys = ON');
+  await transaction(async () => { for (const table of TABLES) await run(`DELETE FROM ${table}`); });
   console.log('База очищена.');
 }
 
-reference.ensureReference();
+await reference.ensureReference();
 
-if (get('SELECT id FROM projects LIMIT 1') && !reset) {
+if ((await get('SELECT id FROM projects LIMIT 1')) && !reset) {
   console.log('Демонстрационные данные уже присутствуют. Для пересоздания используйте: npm run reset');
-  process.exit(0);
+  return;
 }
 
-const regionId = (code) => get('SELECT id FROM regions WHERE code = ?', code).id;
-const countryId = (iso2) => get('SELECT id FROM countries WHERE iso2 = ?', iso2).id;
+const regionId = async (code) => (await get('SELECT id FROM regions WHERE code = ?', code)).id;
+const countryId = async (iso2) => (await get('SELECT id FROM countries WHERE iso2 = ?', iso2)).id;
 
 // --------------------------------------------------------------------------
 // Пользователи: руководитель офиса (администратор) и 9 проектных менеджеров
@@ -56,14 +60,14 @@ const USERS = [
 ];
 
 const users = {};
-transaction(() => {
+await transaction(async () => {
   for (const user of USERS) {
     const { salt, hash } = auth.hashPassword(DEMO_PASSWORD);
-    const result = run(
+    const result = await run(
       `INSERT INTO users (email, full_name, position, role, region_id, password_hash, password_salt, phone, language, notify_email)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'ru', 1)`,
       user.email, user.full_name, user.position, user.role,
-      user.region ? regionId(user.region) : null, hash, salt,
+      user.region ? await regionId(user.region) : null, hash, salt,
       `+998 71 ${200 + Math.floor(Math.random() * 700)}-${10 + Math.floor(Math.random() * 89)}-${10 + Math.floor(Math.random() * 89)}`
     );
     users[user.email] = Number(result.lastInsertRowid);
@@ -140,19 +144,19 @@ const COMPANIES = [
 ];
 
 const companies = {};
-transaction(() => {
+await transaction(async () => {
   for (const company of COMPANIES) {
     const ownerId = U(company.owner);
-    const result = run(
+    const result = await run(
       `INSERT INTO companies (name, country_id, city, website, industry, profile, responsible_user_id, created_by, updated_by)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      company.name, countryId(company.iso2), company.city, company.website || '',
+      company.name, await countryId(company.iso2), company.city, company.website || '',
       company.industry, company.profile, ownerId, ownerId, ownerId
     );
     const companyId = Number(result.lastInsertRowid);
     companies[company.key] = companyId;
     for (const contact of company.contacts || []) {
-      run(
+      await run(
         `INSERT INTO contacts (entity_type, entity_id, full_name, position, phone, email)
          VALUES ('company', ?, ?, ?, ?, ?)`,
         companyId, contact.full_name, contact.position, contact.phone, contact.email
@@ -307,20 +311,20 @@ const PROJECTS = [
 ];
 
 const projectIds = {};
-transaction(() => {
+await transaction(async () => {
   for (const project of PROJECTS) {
     const ownerId = U(project.owner);
     const companyId = companies[project.company];
     const company = COMPANIES.find((c) => c.key === project.company);
-    const code = nextCode('PRJ', 'projects');
+    const code = await nextCode('PRJ', 'projects');
     const createdOffset = -(30 + Math.floor(Math.random() * 120));
     const created = new Date(Date.now() + createdOffset * 86400000).toISOString().slice(0, 19).replace('T', ' ');
 
-    const result = run(
+    const result = await run(
       `INSERT INTO projects (code, record_type, sector_code, area, country_id, company_id, title, description,
          amount, currency, responsible_user_id, status_code, created_by, updated_by, created_at, updated_at, last_activity_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      code, project.type, project.sector, project.area, countryId(company.iso2), companyId,
+      code, project.type, project.sector, project.area, await countryId(company.iso2), companyId,
       project.title, project.description, project.amount, project.currency,
       ownerId, project.status, ownerId, ownerId, created, created,
       new Date(Date.now() - Math.floor(Math.random() * 25) * 86400000).toISOString().slice(0, 19).replace('T', ' ')
@@ -329,13 +333,13 @@ transaction(() => {
     projectIds[project.company] = projectId;
 
     for (const contact of project.contacts) {
-      run(
+      await run(
         `INSERT INTO contacts (entity_type, entity_id, full_name, position, phone, email)
          VALUES ('project', ?, ?, ?, ?, ?)`,
         projectId, contact.full_name, contact.position, contact.phone, contact.email
       );
     }
-    run(
+    await run(
       'INSERT INTO project_status_history (project_id, from_status, to_status, comment, user_id, created_at) VALUES (?, NULL, ?, ?, ?, ?)',
       projectId, project.status, 'Создание записи', ownerId, created
     );
@@ -343,28 +347,28 @@ transaction(() => {
     for (const [partnerKey, roleNote] of project.partners || []) {
       const partnerId = companies[partnerKey];
       if (!partnerId) continue;
-      run('INSERT INTO project_partners (project_id, company_id, role_note) VALUES (?, ?, ?)',
+      await run('INSERT INTO project_partners (project_id, company_id, role_note) VALUES (?, ?, ?)',
         projectId, partnerId, roleNote || '');
     }
 
     for (const [regionCode, locality, regionAmount] of project.locations || []) {
-      const region = get('SELECT id FROM uz_regions WHERE code = ?', regionCode);
+      const region = await get('SELECT id FROM uz_regions WHERE code = ?', regionCode);
       if (!region) continue;
-      run('INSERT INTO project_locations (project_id, uz_region_id, locality, amount) VALUES (?, ?, ?, ?)',
+      await run('INSERT INTO project_locations (project_id, uz_region_id, locality, amount) VALUES (?, ?, ?, ?)',
         projectId, region.id, locality, regionAmount);
     }
 
-    project.steps.forEach((step, index) => {
+    for (const [index, step] of project.steps.entries()) {
       const doneAt = step.state === 'done'
         ? new Date(Date.now() + (step.due - 1) * 86400000).toISOString().slice(0, 19).replace('T', ' ')
         : null;
-      run(
+      await run(
         `INSERT INTO roadmap_steps (project_id, seq, title, due_date, responsible_user_id, state, done_at, done_by, created_by, updated_by)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         projectId, index + 1, step.title, day(step.due), ownerId, step.state,
         doneAt, step.state === 'done' ? ownerId : null, ownerId, ownerId
       );
-    });
+    }
   }
 });
 
@@ -427,23 +431,23 @@ const VISITS = [
     ] },
 ];
 
-transaction(() => {
+await transaction(async () => {
   for (const visit of VISITS) {
     const ownerId = U(visit.owner);
-    const code = nextCode('VIS', 'visits');
-    const result = run(
+    const code = await nextCode('VIS', 'visits');
+    const result = await run(
       `INSERT INTO visits (code, direction, country_id, cities, date_from, date_to, status_code, goal, outcome,
          responsible_user_id, created_by, updated_by)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      code, visit.direction, countryId(visit.iso2), visit.cities, day(visit.from), day(visit.to),
+      code, visit.direction, await countryId(visit.iso2), visit.cities, day(visit.from), day(visit.to),
       visit.status, visit.goal, visit.outcome || '', ownerId, ownerId, ownerId
     );
     const visitId = Number(result.lastInsertRowid);
 
     for (const member of visit.members) {
       const userId = member.key ? U(member.key) : null;
-      const fullName = userId ? get('SELECT full_name FROM users WHERE id = ?', userId).full_name : member.name;
-      run(
+      const fullName = userId ? (await get('SELECT full_name FROM users WHERE id = ?', userId)).full_name : member.name;
+      await run(
         'INSERT INTO visit_members (visit_id, user_id, full_name, organization, position) VALUES (?, ?, ?, ?, ?)',
         visitId, userId, fullName, member.organization || '', member.position || ''
       );
@@ -454,7 +458,7 @@ transaction(() => {
       const companyName = companyId
         ? COMPANIES.find((c) => c.key === meeting.company).name
         : meeting.name;
-      run(
+      await run(
         `INSERT INTO meetings (visit_id, company_id, company_name, project_id, meet_date, meet_time, venue,
            status_code, participants, notes, created_by, updated_by)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -470,7 +474,7 @@ transaction(() => {
 // --------------------------------------------------------------------------
 // Комментарии, произвольное поле «голосование», заявка на исправление
 // --------------------------------------------------------------------------
-transaction(() => {
+await transaction(async () => {
   const comments = [
     ['shandong', 'eastasia', 'Партнёр подтвердил приезд инспекционной группы. Готовим программу посещения комбината в Маргилане.'],
     ['shandong', 'admin', 'Прошу подготовить справку по объёмам за прошлый сезон к совещанию у заместителя министра.'],
@@ -480,13 +484,13 @@ transaction(() => {
     ['volgatex', 'cis', 'Сверка расчётов за первое полугодие проведена во время визита, расхождений не выявлено.'],
   ];
   for (const [companyKey, userKey, body] of comments) {
-    run(
+    await run(
       'INSERT INTO comments (entity_type, entity_id, user_id, body) VALUES (?, ?, ?, ?)',
       'project', projectIds[companyKey], U(userKey), body
     );
   }
 
-  const pollResult = run(
+  const pollResult = await run(
     `INSERT INTO custom_fields (form, field_key, label_ru, label_uz, label_en, type, required, help_text, options_json, position, team_can_fill, created_by)
      VALUES ('project', 'priority_vote', 'Приоритет проекта (голосование офиса)', 'Loyiha ustuvorligi', 'Project priority (office vote)',
              'poll', 0, 'Сотрудники офиса оценивают приоритетность проекта для планирования ресурсов.',
@@ -496,13 +500,13 @@ transaction(() => {
   const pollFieldId = Number(pollResult.lastInsertRowid);
   const votes = [['anadolu', 'admin', 'Высокий'], ['anadolu', 'europe', 'Высокий'], ['anadolu', 'cis', 'Средний']];
   for (const [companyKey, userKey, option] of votes) {
-    run(
+    await run(
       'INSERT INTO poll_votes (field_id, entity_type, entity_id, user_id, option) VALUES (?, ?, ?, ?, ?)',
       pollFieldId, 'project', projectIds[companyKey], U(userKey), option
     );
   }
 
-  run(
+  await run(
     `INSERT INTO custom_fields (form, field_key, label_ru, label_uz, label_en, type, required, help_text, options_json, position, team_can_fill, created_by)
      VALUES ('project', 'support_measure', 'Мера государственной поддержки', 'Davlat qollab-quvvatlash chorasi', 'State support measure',
              'select', 0, 'Указывается, если по проекту предусмотрена мера поддержки.', ?, 2, 1, ?)`,
@@ -510,7 +514,7 @@ transaction(() => {
     U('admin')
   );
 
-  run(
+  await run(
     `INSERT INTO correction_requests (entity_type, entity_id, entity_label, requested_by, reason, proposed_json)
      VALUES ('project', ?, ?, ?, ?, ?)`,
     projectIds.saopaulo, 'Поставка махровых изделий в Бразилию', U('latam'),
@@ -518,12 +522,12 @@ transaction(() => {
     JSON.stringify({ amount: 870000 })
   );
 
-  run(
+  await run(
     `INSERT INTO saved_filters (user_id, entity, name, query_json, is_shared)
      VALUES (?, 'projects', 'Просроченные этапы', ?, 1)`,
     U('admin'), JSON.stringify({ overdue: '1' })
   );
-  run(
+  await run(
     `INSERT INTO saved_filters (user_id, entity, name, query_json, is_shared)
      VALUES (?, 'projects', 'Инвестиции — в реализации', ?, 1)`,
     U('admin'), JSON.stringify({ area: 'investment', status: 'implementation' })
@@ -531,17 +535,18 @@ transaction(() => {
 });
 
 const counts = {
-  Пользователи: all('SELECT id FROM users').length,
-  Компании: all('SELECT id FROM companies').length,
-  Проекты: all('SELECT id FROM projects').length,
-  'Этапы дорожных карт': all('SELECT id FROM roadmap_steps').length,
-  Визиты: all('SELECT id FROM visits').length,
-  Встречи: all('SELECT id FROM meetings').length,
-  'Местные партнёры': all('SELECT id FROM project_partners').length,
-  'Площадки в Узбекистане': all('SELECT id FROM project_locations').length,
+  Пользователи: (await all('SELECT id FROM users')).length,
+  Компании: (await all('SELECT id FROM companies')).length,
+  Проекты: (await all('SELECT id FROM projects')).length,
+  'Этапы дорожных карт': (await all('SELECT id FROM roadmap_steps')).length,
+  Визиты: (await all('SELECT id FROM visits')).length,
+  Встречи: (await all('SELECT id FROM meetings')).length,
+  'Местные партнёры': (await all('SELECT id FROM project_partners')).length,
+  'Площадки в Узбекистане': (await all('SELECT id FROM project_locations')).length,
 };
 
 console.log('\nДемонстрационные данные созданы:');
 for (const [label, value] of Object.entries(counts)) console.log(`   ${label}: ${value}`);
 console.log(`\n   Вход в систему: admin@textile.gov.uz / ${DEMO_PASSWORD}`);
 console.log(`   Проектный менеджер: europe@textile.gov.uz / ${DEMO_PASSWORD}\n`);
+}

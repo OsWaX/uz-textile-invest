@@ -56,9 +56,9 @@ function verifyToken(token) {
   return sessionId;
 }
 
-function createSession(user, req, res) {
+async function createSession(user, req, res) {
   const sessionId = crypto.randomUUID();
-  run(
+  await run(
     'INSERT INTO sessions (id, user_id, ip, user_agent) VALUES (?, ?, ?, ?)',
     sessionId, user.id, req.clientIp || '', (req.headers['user-agent'] || '').slice(0, 250)
   );
@@ -71,10 +71,10 @@ function createSession(user, req, res) {
   return sessionId;
 }
 
-function destroySession(req, res) {
+async function destroySession(req, res) {
   const token = parseCookies(req)[COOKIE_NAME];
   const sessionId = verifyToken(token);
-  if (sessionId) run('UPDATE sessions SET revoked = 1 WHERE id = ?', sessionId);
+  if (sessionId) await run('UPDATE sessions SET revoked = 1 WHERE id = ?', sessionId);
   setCookie(res, COOKIE_NAME, '', { maxAge: 0, httpOnly: true, secure: config.secureCookies });
 }
 
@@ -100,78 +100,78 @@ const publicUser = (user) => ({
  * Возвращает пользователя текущей сессии либо null.
  * Сессия завершается по тайм-ауту неактивности (настройка администратора).
  */
-function currentUser(req) {
+async function currentUser(req) {
   const token = parseCookies(req)[COOKIE_NAME];
   const sessionId = verifyToken(token);
   if (!sessionId) return null;
 
-  const session = get('SELECT * FROM sessions WHERE id = ? AND revoked = 0', sessionId);
+  const session = await get('SELECT * FROM sessions WHERE id = ? AND revoked = 0', sessionId);
   if (!session) return null;
 
-  const timeoutMinutes = Number(getSetting('security.session_timeout_minutes', config.sessionTimeoutMinutes));
+  const timeoutMinutes = Number(await getSetting('security.session_timeout_minutes', config.sessionTimeoutMinutes));
   const lastSeen = new Date(`${session.last_seen_at.replace(' ', 'T')}Z`).getTime();
   if (Number.isFinite(lastSeen) && Date.now() - lastSeen > timeoutMinutes * 60000) {
-    run('UPDATE sessions SET revoked = 1 WHERE id = ?', sessionId);
+    await run('UPDATE sessions SET revoked = 1 WHERE id = ?', sessionId);
     return null;
   }
 
-  const user = get('SELECT * FROM users WHERE id = ? AND is_active = 1', session.user_id);
+  const user = await get('SELECT * FROM users WHERE id = ? AND is_active = 1', session.user_id);
   if (!user) return null;
 
-  run("UPDATE sessions SET last_seen_at = datetime('now') WHERE id = ?", sessionId);
+  await run("UPDATE sessions SET last_seen_at = datetime('now') WHERE id = ?", sessionId);
   user.sessionId = sessionId;
   return user;
 }
 
-function requireUser(req) {
-  const user = currentUser(req);
+async function requireUser(req) {
+  const user = await currentUser(req);
   if (!user) throw unauthorized('Сессия истекла или отсутствует. Войдите в систему заново.');
   return user;
 }
 
 /** Учёт неудачных попыток входа и временная блокировка учётной записи. */
-function registerFailedAttempt(user) {
+async function registerFailedAttempt(user) {
   const attempts = (user.failed_attempts || 0) + 1;
   const maxAttempts = config.loginMaxAttempts;
   if (attempts >= maxAttempts) {
     const until = new Date(Date.now() + config.loginLockMinutes * 60000)
       .toISOString().slice(0, 19).replace('T', ' ');
-    run('UPDATE users SET failed_attempts = ?, locked_until = ? WHERE id = ?', attempts, until, user.id);
+    await run('UPDATE users SET failed_attempts = ?, locked_until = ? WHERE id = ?', attempts, until, user.id);
     return { locked: true, until };
   }
-  run('UPDATE users SET failed_attempts = ? WHERE id = ?', attempts, user.id);
+  await run('UPDATE users SET failed_attempts = ? WHERE id = ?', attempts, user.id);
   return { locked: false, remaining: maxAttempts - attempts };
 }
 
-function isLocked(user) {
+async function isLocked(user) {
   if (!user.locked_until) return false;
   const until = new Date(`${user.locked_until.replace(' ', 'T')}Z`).getTime();
   if (Date.now() >= until) {
-    run('UPDATE users SET locked_until = NULL, failed_attempts = 0 WHERE id = ?', user.id);
+    await run('UPDATE users SET locked_until = NULL, failed_attempts = 0 WHERE id = ?', user.id);
     return false;
   }
   return true;
 }
 
-function resetAttempts(user) {
-  run(
+async function resetAttempts(user) {
+  await run(
     "UPDATE users SET failed_attempts = 0, locked_until = NULL, last_login_at = datetime('now') WHERE id = ?",
     user.id
   );
 }
 
 /** Подготовка секрета TOTP для подключения двухфакторной аутентификации. */
-function beginTotpSetup(user) {
+async function beginTotpSetup(user) {
   const secret = totp.generateSecret();
-  run('UPDATE users SET totp_secret = ?, totp_enabled = 0 WHERE id = ?', secret, user.id);
+  await run('UPDATE users SET totp_secret = ?, totp_enabled = 0 WHERE id = ?', secret, user.id);
   return { secret, uri: totp.otpauthUri(secret, user.email) };
 }
 
-function confirmTotp(user, code) {
-  const fresh = get('SELECT totp_secret FROM users WHERE id = ?', user.id);
+async function confirmTotp(user, code) {
+  const fresh = await get('SELECT totp_secret FROM users WHERE id = ?', user.id);
   if (!fresh?.totp_secret) throw badRequest('Сначала запросите секретный ключ для приложения-аутентификатора');
   if (!totp.verifyCode(fresh.totp_secret, code)) throw badRequest('Неверный одноразовый код');
-  run('UPDATE users SET totp_enabled = 1 WHERE id = ?', user.id);
+  await run('UPDATE users SET totp_enabled = 1 WHERE id = ?', user.id);
   return true;
 }
 

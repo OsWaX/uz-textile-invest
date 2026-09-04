@@ -23,8 +23,8 @@ test.after(async () => {
   cleanup();
 });
 
-test('Пароли хранятся только в виде соли и хеша', () => {
-  const user = db.get("SELECT * FROM users WHERE email = 'admin@textile.gov.uz'");
+test('Пароли хранятся только в виде соли и хеша', async () => {
+  const user = await db.get("SELECT * FROM users WHERE email = 'admin@textile.gov.uz'");
   assert.ok(user.password_hash.length >= 128, 'хеш scrypt длиной 64 байта');
   assert.ok(user.password_salt.length >= 16, 'соль сохранена');
   assert.ok(!user.password_hash.includes(PASSWORD), 'пароль не хранится в открытом виде');
@@ -77,7 +77,7 @@ test('Учётная запись блокируется после серии �
   const correct = await client.post('/api/auth/login', { email: 'locktest@textile.gov.uz', password: PASSWORD });
   assert.equal(correct.status, 403, 'верный пароль тоже отклоняется, пока действует блокировка');
 
-  const user = db.get("SELECT * FROM users WHERE email = 'locktest@textile.gov.uz'");
+  const user = await db.get("SELECT * FROM users WHERE email = 'locktest@textile.gov.uz'");
   assert.ok(user.locked_until, 'срок блокировки записан');
 
   // Администратор снимает блокировку
@@ -99,7 +99,7 @@ test('Сессия завершается по тайм-ауту неактив�
   assert.equal((await client.get('/api/auth/me')).status, 200);
 
   // Имитируем бездействие: сдвигаем отметку последней активности в прошлое
-  db.run("UPDATE sessions SET last_seen_at = datetime('now', '-31 minute') WHERE revoked = 0");
+  await db.run("UPDATE sessions SET last_seen_at = datetime('now', '-31 minute') WHERE revoked = 0");
   const expired = await client.get('/api/auth/me');
   assert.equal(expired.status, 401, 'сессия завершена по тайм-ауту');
 
@@ -205,8 +205,9 @@ test('Статические файлы не отдаются за предел�
 });
 
 test('Загрузка файлов ограничена по типу', async () => {
+  const germany = await db.get("SELECT id FROM countries WHERE iso2='DE'");
   const company = await admin.post('/api/companies', {
-    name: 'Тестовая компания', country_id: db.get("SELECT id FROM countries WHERE iso2='DE'").id,
+    name: 'Тестовая компания', country_id: germany.id,
   });
   const bad = await admin.upload('company', company.body.id, 'exploit.sh', '#!/bin/sh\nrm -rf /', 'application/x-sh');
   assert.equal(bad.status, 400, 'исполняемый файл отклонён');
@@ -235,7 +236,7 @@ test('Права проверяются на сервере независимо
 });
 
 test('Отключённая учётная запись теряет доступ немедленно', async () => {
-  const user = db.get("SELECT id FROM users WHERE email = 'pm@textile.gov.uz'");
+  const user = await db.get("SELECT id FROM users WHERE email = 'pm@textile.gov.uz'");
   const client = createClient();
   await client.login('pm@textile.gov.uz', PASSWORD);
   assert.equal((await client.get('/api/projects')).status, 200);
@@ -245,7 +246,7 @@ test('Отключённая учётная запись теряет досту
 });
 
 test('В системе нельзя отключить последнего администратора', async () => {
-  const adminUser = db.get("SELECT id FROM users WHERE email = 'admin@textile.gov.uz'");
+  const adminUser = await db.get("SELECT id FROM users WHERE email = 'admin@textile.gov.uz'");
   const result = await admin.patch(`/api/admin/users/${adminUser.id}`, { is_active: false });
   assert.equal(result.status, 409);
   assert.match(result.body.error, /хотя бы один активный администратор/);

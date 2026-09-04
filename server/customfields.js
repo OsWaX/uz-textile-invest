@@ -23,16 +23,16 @@ const FIELD_TYPES = {
 
 const FORMS = { project: 'Проект / соглашение', visit: 'Визит', company: 'Компания' };
 
-const listFields = (form, includeInactive = false) =>
-  all(
+const listFields = async (form, includeInactive = false) =>
+  (await all(
     `SELECT * FROM custom_fields WHERE form = ?${includeInactive ? '' : ' AND is_active = 1'}
      ORDER BY position, id`,
     form
-  ).map((field) => ({ ...field, options: JSON.parse(field.options_json || '[]'), required: Boolean(field.required), team_can_fill: Boolean(field.team_can_fill), is_active: Boolean(field.is_active) }));
+  )).map((field) => ({ ...field, options: JSON.parse(field.options_json || '[]'), required: Boolean(field.required), team_can_fill: Boolean(field.team_can_fill), is_active: Boolean(field.is_active) }));
 
 /** Значения произвольных полей одной записи + результаты голосований. */
-function valuesFor(entityType, entityId, userId = null) {
-  const rows = all(
+async function valuesFor(entityType, entityId, userId = null) {
+  const rows = await all(
     `SELECT cv.field_id, cv.value_json, cf.field_key, cf.type
      FROM custom_values cv JOIN custom_fields cf ON cf.id = cv.field_id
      WHERE cv.entity_type = ? AND cv.entity_id = ?`,
@@ -44,20 +44,21 @@ function valuesFor(entityType, entityId, userId = null) {
   }
 
   const polls = {};
-  const pollFields = all(
+  const pollFields = await all(
     `SELECT cf.id, cf.field_key FROM custom_fields cf
      WHERE cf.form = (SELECT form FROM custom_fields WHERE id = cf.id) AND cf.type = 'poll' AND cf.is_active = 1`
   );
   for (const field of pollFields) {
-    const votes = all(
+    const votes = await all(
       'SELECT option, COUNT(*) AS n FROM poll_votes WHERE field_id = ? AND entity_type = ? AND entity_id = ? GROUP BY option',
       field.id, entityType, entityId
     );
     if (!votes.length && !userId) continue;
-    const myVote = userId
-      ? get('SELECT option FROM poll_votes WHERE field_id = ? AND entity_type = ? AND entity_id = ? AND user_id = ?',
-        field.id, entityType, entityId, userId)?.option ?? null
+    const voteRow = userId
+      ? await get('SELECT option FROM poll_votes WHERE field_id = ? AND entity_type = ? AND entity_id = ? AND user_id = ?',
+        field.id, entityType, entityId, userId)
       : null;
+    const myVote = voteRow?.option ?? null;
     polls[field.field_key] = { field_id: field.id, tally: votes, my_vote: myVote, total: votes.reduce((s, v) => s + v.n, 0) };
   }
 
@@ -65,12 +66,12 @@ function valuesFor(entityType, entityId, userId = null) {
 }
 
 /** Проверяет и сохраняет значения произвольных полей формы. */
-function saveValues(form, entityType, entityId, payload = {}, user) {
-  const fields = listFields(form);
+async function saveValues(form, entityType, entityId, payload = {}, user) {
+  const fields = await listFields(form);
   for (const field of fields) {
     const provided = Object.prototype.hasOwnProperty.call(payload, field.field_key);
     if (!provided) {
-      if (field.required && !get('SELECT id FROM custom_values WHERE field_id = ? AND entity_type = ? AND entity_id = ?', field.id, entityType, entityId)) {
+      if (field.required && !(await get('SELECT id FROM custom_values WHERE field_id = ? AND entity_type = ? AND entity_id = ?', field.id, entityType, entityId))) {
         throw badRequest(`Поле «${field.label_ru}» обязательно для заполнения`);
       }
       continue;
@@ -82,7 +83,7 @@ function saveValues(form, entityType, entityId, payload = {}, user) {
     if (field.required && (value === null || value === '' || (Array.isArray(value) && !value.length))) {
       throw badRequest(`Поле «${field.label_ru}» обязательно для заполнения`);
     }
-    run(
+    await run(
       `INSERT INTO custom_values (field_id, entity_type, entity_id, value_json, updated_at)
        VALUES (?, ?, ?, ?, datetime('now'))
        ON CONFLICT(field_id, entity_type, entity_id)
@@ -139,32 +140,32 @@ function normalize(field, raw) {
 }
 
 /** Голосование по полю типа «poll». */
-function vote(fieldId, entityType, entityId, userId, option) {
-  const field = get("SELECT * FROM custom_fields WHERE id = ? AND type = 'poll' AND is_active = 1", fieldId);
+async function vote(fieldId, entityType, entityId, userId, option) {
+  const field = await get("SELECT * FROM custom_fields WHERE id = ? AND type = 'poll' AND is_active = 1", fieldId);
   if (!field) throw badRequest('Голосование не найдено');
   const options = JSON.parse(field.options_json || '[]');
   if (!options.includes(option)) throw badRequest('Недопустимый вариант ответа');
-  run(
+  await run(
     `INSERT INTO poll_votes (field_id, entity_type, entity_id, user_id, option) VALUES (?, ?, ?, ?, ?)
      ON CONFLICT(field_id, entity_type, entity_id, user_id) DO UPDATE SET option = excluded.option, created_at = datetime('now')`,
     fieldId, entityType, entityId, userId, option
   );
-  return valuesFor(entityType, entityId, userId).polls[field.field_key];
+  return (await valuesFor(entityType, entityId, userId)).polls[field.field_key];
 }
 
 /** Колонки произвольных полей для выгрузки в Excel. */
-function exportColumns(form) {
-  return listFields(form)
+async function exportColumns(form) {
+  return (await listFields(form))
     .filter((f) => f.type !== 'file')
     .map((f) => ({ header: f.label_ru, key: `cf_${f.field_key}`, type: f.type === 'money' || f.type === 'number' ? 'number' : 'text', width: 22 }));
 }
 
-function exportValues(form, entityType, entityIds) {
-  const fields = listFields(form);
+async function exportValues(form, entityType, entityIds) {
+  const fields = await listFields(form);
   const byEntity = new Map(entityIds.map((id) => [id, {}]));
   if (!fields.length || !entityIds.length) return byEntity;
   const placeholders = entityIds.map(() => '?').join(',');
-  const rows = all(
+  const rows = await all(
     `SELECT cv.entity_id, cf.field_key, cf.type, cv.value_json FROM custom_values cv
      JOIN custom_fields cf ON cf.id = cv.field_id
      WHERE cv.entity_type = ? AND cv.entity_id IN (${placeholders})`,
