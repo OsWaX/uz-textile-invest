@@ -1,0 +1,1698 @@
+<title>Rasta Marketplace</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bitter:ital,wght@0,500;0,600;0,700;1,500&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+/* ---------- tokens: light is the base, both dark states redefine only tokens ---------- */
+:root{
+  --ground:#F2F4F3; --surface:#FFFFFF; --surface-2:#F7F9F9; --surface-3:#EAEEEF;
+  --ink:#101F29; --ink-2:#41545F; --ink-3:#6B7D87;
+  --line:#D5DDE0; --line-strong:#B4C0C5;
+  --brand:#123E82; --brand-2:#1462A8; --brand-ink:#FFFFFF;
+  --tile:#17958E;
+  --cat-seller:#1462A8; --cat-fee:#17958E; --cat-acq:#8A6BC4; --cat-ship:#C2792A;
+  --good:#1B7F52; --good-bg:#E4F1EA; --warn:#A9701A; --warn-bg:#FBF0DC; --bad:#B0362C; --bad-bg:#FAE7E4;
+  --shadow:0 1px 2px rgba(16,31,41,.06), 0 8px 24px -16px rgba(16,31,41,.28);
+  --radius:10px;
+  --f-display:"Bitter",Georgia,"Times New Roman",serif;
+  --f-body:"Golos Text","Segoe UI",system-ui,-apple-system,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#0B141C; --surface:#12212D; --surface-2:#172A38; --surface-3:#1F3646;
+    --ink:#E6EEF3; --ink-2:#A8BCC8; --ink-3:#7D95A3;
+    --line:#27404F; --line-strong:#36586C;
+    --brand:#4C93DC; --brand-2:#3B86D0; --brand-ink:#08131B;
+    --tile:#1FA98A;
+    --cat-seller:#3B86D0; --cat-fee:#1FA98A; --cat-acq:#9B7BD8; --cat-ship:#BC8129;
+    --good:#34B37A; --good-bg:#122E24; --warn:#D9A040; --warn-bg:#2E2413; --bad:#E2695C; --bad-bg:#31191A;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.8);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0B141C; --surface:#12212D; --surface-2:#172A38; --surface-3:#1F3646;
+  --ink:#E6EEF3; --ink-2:#A8BCC8; --ink-3:#7D95A3;
+  --line:#27404F; --line-strong:#36586C;
+  --brand:#4C93DC; --brand-2:#3B86D0; --brand-ink:#08131B;
+  --tile:#1FA98A;
+  --cat-seller:#3B86D0; --cat-fee:#1FA98A; --cat-acq:#9B7BD8; --cat-ship:#BC8129;
+  --good:#34B37A; --good-bg:#122E24; --warn:#D9A040; --warn-bg:#2E2413; --bad:#E2695C; --bad-bg:#31191A;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.8);
+}
+
+*{box-sizing:border-box}
+body{background:var(--ground);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4{font-family:var(--f-display);font-weight:600;line-height:1.2;text-wrap:balance;margin:0}
+p{margin:0}
+a{color:var(--brand-2);text-decoration:none}
+a:hover{text-decoration:underline}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--brand-2);outline-offset:2px;border-radius:4px}
+.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.wrap{max-width:1180px;margin:0 auto;padding:0 20px}
+.stack{display:flex;flex-direction:column}
+.row{display:flex;align-items:center}
+.gap4{gap:4px}.gap8{gap:8px}.gap12{gap:12px}.gap16{gap:16px}.gap24{gap:24px}
+.muted{color:var(--ink-3)}.dim{color:var(--ink-2)}
+.eyebrow{font-family:var(--f-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
+.hidden{display:none!important}
+
+/* ---------- top chrome ---------- */
+.demo-strip{background:var(--brand);color:var(--brand-ink);font-size:12.5px}
+.demo-strip .wrap{display:flex;gap:12px;align-items:center;justify-content:space-between;padding-block:6px;flex-wrap:wrap}
+.demo-strip b{font-weight:600}
+header.top{position:sticky;top:0;z-index:40;background:var(--surface);border-bottom:1px solid var(--line)}
+.topbar{display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:center;padding-block:12px}
+.brand{display:flex;align-items:center;gap:10px;color:var(--ink)}
+.brand:hover{text-decoration:none}
+.brand-mark{width:30px;height:30px;flex:none}
+.brand-name{font-family:var(--f-display);font-weight:700;font-size:20px;letter-spacing:-.01em}
+.brand-sub{font-size:11px;color:var(--ink-3);line-height:1;margin-top:2px}
+.search{display:flex;gap:0;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface-2);overflow:hidden}
+.search input{flex:1;min-width:0;border:0;background:transparent;padding:9px 12px;color:var(--ink);font:inherit}
+.search input:focus{outline:none}
+.search button{border:0;background:var(--brand);color:var(--brand-ink);padding:0 16px;cursor:pointer;font-weight:600}
+.tools{display:flex;align-items:center;gap:8px}
+.chipbtn{border:1px solid var(--line-strong);background:var(--surface);border-radius:8px;padding:7px 10px;cursor:pointer;font-size:13px;display:inline-flex;align-items:center;gap:6px}
+.chipbtn:hover{border-color:var(--brand-2)}
+.chipbtn[aria-pressed="true"]{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+.langs{display:flex;border:1px solid var(--line-strong);border-radius:8px;overflow:hidden}
+.langs button{border:0;background:var(--surface);padding:7px 9px;cursor:pointer;font-size:12px;font-weight:600;color:var(--ink-2)}
+.langs button[aria-pressed="true"]{background:var(--surface-3);color:var(--ink)}
+.cartbtn{position:relative}
+.cartbtn .badge{position:absolute;top:-7px;right:-7px;background:var(--cat-ship);color:#fff;border-radius:999px;font-size:11px;min-width:18px;height:18px;display:grid;place-items:center;padding:0 5px;font-family:var(--f-mono)}
+nav.main{border-top:1px solid var(--line);background:var(--surface-2)}
+nav.main .wrap{display:flex;gap:2px;overflow-x:auto}
+nav.main a{padding:10px 12px;font-size:13.5px;color:var(--ink-2);border-bottom:2px solid transparent;white-space:nowrap}
+nav.main a:hover{color:var(--ink);text-decoration:none}
+nav.main a[aria-current="page"]{color:var(--ink);border-bottom-color:var(--brand-2);font-weight:600}
+
+main{padding:28px 0 56px}
+section.block{margin-bottom:40px}
+.section-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:16px;flex-wrap:wrap}
+.section-head h2{font-size:24px}
+
+/* ---------- surfaces ---------- */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:20px}
+.panel.flat{box-shadow:none}
+.panel.lift{box-shadow:var(--shadow)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px}
+.kpi .v{font-family:var(--f-mono);font-size:22px;font-weight:700;letter-spacing:-.03em;display:block;margin-top:6px}
+.kpi .sub{font-size:12px;color:var(--ink-3);margin-top:4px}
+.pill{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:3px 9px;font-size:12px;font-weight:600;border:1px solid transparent}
+.pill.good{background:var(--good-bg);color:var(--good);border-color:color-mix(in srgb,var(--good) 30%,transparent)}
+.pill.warn{background:var(--warn-bg);color:var(--warn);border-color:color-mix(in srgb,var(--warn) 30%,transparent)}
+.pill.bad{background:var(--bad-bg);color:var(--bad);border-color:color-mix(in srgb,var(--bad) 30%,transparent)}
+.pill.neutral{background:var(--surface-3);color:var(--ink-2);border-color:var(--line)}
+.btn{border:1px solid var(--brand);background:var(--brand);color:var(--brand-ink);border-radius:8px;padding:9px 16px;font-weight:600;cursor:pointer;font-size:14px}
+.btn:hover{filter:brightness(1.08)}
+.btn.ghost{background:transparent;color:var(--brand-2);border-color:var(--line-strong)}
+.btn.ghost:hover{border-color:var(--brand-2);filter:none}
+.btn.small{padding:6px 11px;font-size:13px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+label.field{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--ink-2)}
+input[type=text],input[type=number],select,textarea{border:1px solid var(--line-strong);background:var(--surface-2);color:var(--ink);border-radius:8px;padding:8px 10px;font:inherit;font-size:14px;width:100%}
+textarea{min-height:70px;resize:vertical}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;font-weight:600;color:var(--ink-2);font-size:12px;text-transform:uppercase;letter-spacing:.06em;padding:8px 10px;border-bottom:1px solid var(--line-strong)}
+td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+.scroll-x{overflow-x:auto}
+
+/* ---------- money split bar (the recurring device) ---------- */
+.splitbar{display:flex;gap:2px;height:14px;border-radius:3px;overflow:hidden;background:var(--surface-3)}
+.splitbar > span{display:block;border-radius:2px}
+.splitbar > span:first-child{border-radius:3px 2px 2px 3px}
+.splitbar > span:last-child{border-radius:2px 3px 3px 2px}
+.split-legend{display:flex;flex-wrap:wrap;gap:10px 18px;margin-top:10px;font-size:12.5px}
+.split-legend .li{display:flex;align-items:center;gap:6px;color:var(--ink-2)}
+.swatch{width:10px;height:10px;border-radius:2px;flex:none}
+.receipt{width:100%;font-size:13.5px}
+.receipt td{padding:6px 0;border-bottom:1px dashed var(--line)}
+.receipt tr.total td{border-top:1px solid var(--line-strong);border-bottom:0;padding-top:9px;font-weight:700}
+.receipt td:last-child{text-align:right;white-space:nowrap}
+.tip{position:fixed;z-index:90;background:var(--surface);border:1px solid var(--line-strong);border-radius:8px;padding:8px 10px;font-size:12.5px;box-shadow:var(--shadow);pointer-events:none;max-width:230px}
+
+/* ---------- product cards ---------- */
+.grid-products{display:grid;grid-template-columns:repeat(auto-fill,minmax(228px,1fr));gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column}
+.card:hover{border-color:var(--line-strong)}
+.card .art{aspect-ratio:4/3;background:var(--surface-3);display:block;width:100%}
+.card .body{padding:12px 14px 14px;display:flex;flex-direction:column;gap:8px;flex:1}
+.card .name{font-size:14.5px;font-weight:500;color:var(--ink);line-height:1.35}
+.card .name:hover{color:var(--brand-2);text-decoration:none}
+.price{font-family:var(--f-mono);font-weight:700;font-size:17px;letter-spacing:-.03em}
+.card .seller{font-size:12.5px;color:var(--ink-2);display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.verified{color:var(--good);font-weight:600;font-size:12px}
+.deliv{font-size:12.5px;color:var(--ink-2)}
+.why{border:0;background:transparent;color:var(--ink-3);cursor:pointer;font-size:12px;text-decoration:underline dotted;padding:0;text-align:left}
+.card .foot{display:flex;gap:8px;align-items:center;margin-top:auto}
+
+/* ---------- layout helpers ---------- */
+.split-2{display:grid;grid-template-columns:1.55fr 1fr;gap:24px;align-items:start}
+.split-side{display:grid;grid-template-columns:250px 1fr;gap:24px;align-items:start}
+@media (max-width:900px){.split-2,.split-side{grid-template-columns:1fr}}
+.hero{display:grid;grid-template-columns:1.1fr .9fr;gap:32px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:28px;position:relative;overflow:hidden}
+@media (max-width:900px){.hero{grid-template-columns:1fr;padding:22px}}
+.hero h1{font-size:34px;letter-spacing:-.02em}
+.hero .lead{color:var(--ink-2);font-size:16px;max-width:56ch;margin-top:12px}
+.hero-facts{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+.fact{border:1px solid var(--line);background:var(--surface-2);border-radius:999px;padding:5px 11px;font-size:12.5px;color:var(--ink-2)}
+.tilepattern{position:absolute;inset:auto -40px -60px auto;width:280px;opacity:.14;pointer-events:none}
+
+/* ---------- misc components ---------- */
+.steps{counter-reset:s;display:grid;gap:10px}
+.step{display:grid;grid-template-columns:26px 1fr;gap:12px;align-items:start}
+.step .n{width:26px;height:26px;border-radius:50%;background:var(--surface-3);color:var(--ink-2);display:grid;place-items:center;font-family:var(--f-mono);font-size:12px;font-weight:700}
+.step.done .n{background:var(--good);color:#fff}
+.step.now .n{background:var(--brand);color:var(--brand-ink)}
+.timeline{display:grid;gap:0}
+.tl{display:grid;grid-template-columns:16px 1fr;gap:12px}
+.tl .dot{position:relative;display:flex;justify-content:center}
+.tl .dot i{width:10px;height:10px;border-radius:50%;background:var(--line-strong);margin-top:6px;display:block}
+.tl.done .dot i{background:var(--good)}
+.tl.now .dot i{background:var(--brand-2);box-shadow:0 0 0 4px color-mix(in srgb,var(--brand-2) 22%,transparent)}
+.tl .dot::before{content:"";position:absolute;top:16px;bottom:-6px;width:2px;background:var(--line)}
+.tl:last-child .dot::before{display:none}
+.tl .txt{padding-bottom:14px}
+.bars{display:grid;gap:10px}
+.bar-row{display:grid;grid-template-columns:150px 1fr auto;gap:12px;align-items:center;font-size:13px}
+.bar-track{display:block;background:var(--surface-3);border-radius:4px;height:12px;overflow:hidden}
+.bar-fill{display:block;height:12px;border-radius:4px;background:var(--brand-2)}
+.bar-row.hl .bar-fill{background:var(--good)}
+.bar-row.hl{font-weight:600}
+.note{font-size:12.5px;color:var(--ink-3)}
+.callout{border-left:3px solid var(--brand-2);background:var(--surface-2);padding:12px 14px;border-radius:0 8px 8px 0;font-size:14px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:18px;overflow-x:auto}
+.tabs button{border:0;background:transparent;padding:9px 13px;cursor:pointer;color:var(--ink-2);border-bottom:2px solid transparent;white-space:nowrap;font-size:14px}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--brand-2);font-weight:600}
+.order-card{border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);overflow:hidden}
+.order-card > header{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px 16px;background:var(--surface-2);border-bottom:1px solid var(--line);flex-wrap:wrap}
+.order-card .inner{padding:16px}
+.shipment{border:1px solid var(--line);border-radius:8px;padding:14px;background:var(--surface)}
+.thumb{width:56px;height:56px;border-radius:6px;flex:none;background:var(--surface-3)}
+.li-item{display:flex;gap:12px;align-items:flex-start}
+.checkbox{display:flex;gap:9px;align-items:flex-start;font-size:13.5px;color:var(--ink-2);cursor:pointer}
+.checkbox input{margin-top:3px}
+dialog{border:1px solid var(--line-strong);border-radius:12px;background:var(--surface);color:var(--ink);padding:0;max-width:560px;width:calc(100% - 32px);box-shadow:var(--shadow)}
+dialog::backdrop{background:rgba(6,16,24,.55)}
+dialog .dlg-head{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line)}
+dialog .dlg-body{padding:18px}
+footer.site{border-top:1px solid var(--line);background:var(--surface);padding:26px 0 40px;font-size:13px;color:var(--ink-2)}
+footer.site .cols{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:24px}
+@media (max-width:760px){footer.site .cols{grid-template-columns:1fr}}
+@media (max-width:760px){
+  .topbar{grid-template-columns:1fr auto;row-gap:10px}
+  .search{grid-column:1/-1;order:3}
+  .hero h1{font-size:27px}
+  .bar-row{grid-template-columns:110px 1fr auto}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="demo-strip"><div class="wrap">
+  <span id="demoNote"></span>
+  <button class="chipbtn" id="resetDemo" style="background:transparent;color:inherit;border-color:currentColor"></button>
+</div></div>
+
+<header class="top">
+  <div class="wrap topbar">
+    <a class="brand" href="#/" data-nav>
+      <svg class="brand-mark" viewBox="0 0 40 40" aria-hidden="true">
+        <rect x="1" y="1" width="38" height="38" rx="7" fill="var(--brand)"></rect>
+        <path d="M20 7l13 13-13 13L7 20z" fill="none" stroke="var(--brand-ink)" stroke-width="2"></path>
+        <path d="M20 13.5l6.5 6.5-6.5 6.5-6.5-6.5z" fill="var(--tile)"></path>
+      </svg>
+      <span>
+        <span class="brand-name">Rasta</span>
+        <span class="brand-sub" id="brandSub"></span>
+      </span>
+    </a>
+    <form class="search" id="searchForm" role="search">
+      <input type="text" id="q" autocomplete="off">
+      <button type="submit" id="searchBtn"></button>
+    </form>
+    <div class="tools">
+      <select id="city" style="width:auto;padding:7px 8px;font-size:13px"></select>
+      <div class="langs" role="group" aria-label="Language">
+        <button data-lang="ru" type="button">RU</button>
+        <button data-lang="uz" type="button">UZ</button>
+        <button data-lang="en" type="button">EN</button>
+      </div>
+      <a class="chipbtn cartbtn" href="#/cart" data-nav id="cartLink">🛒 <span class="cart-label"></span><span class="badge hidden" id="cartCount">0</span></a>
+    </div>
+  </div>
+  <nav class="main"><div class="wrap" id="nav"></div></nav>
+</header>
+
+<main><div class="wrap" id="view"></div></main>
+
+<footer class="site"><div class="wrap cols" id="footer"></div></footer>
+
+<dialog id="dlg"><div class="dlg-head"><h3 id="dlgTitle" style="font-size:17px"></h3><button class="chipbtn" id="dlgClose" aria-label="Close">✕</button></div><div class="dlg-body" id="dlgBody"></div></dialog>
+<div class="tip hidden" id="tip" role="status"></div>
+
+<script>
+"use strict";
+/* =========================================================================
+   Rasta — демонстрационный прототип маркетплейса по ТЗ v1.0
+   Модель: складов оператора нет, товар у продавца, платёж расщепляется
+   и доля продавца уходит на его счёт напрямую.
+   ========================================================================= */
+
+/* ---------------------------- i18n ---------------------------- */
+const DICT = {
+  ru:{
+    tagline:"маркетплейс без складов", demo:"<b>Демонстрационный прототип</b> по ТЗ v1.0. Данные учебные, платежи не проводятся.",
+    reset:"Сбросить демо", search:"Найти товар, продавца, категорию", searchBtn:"Найти", cart:"Корзина",
+    nav_home:"Витрина", nav_catalog:"Каталог", nav_orders:"Мои заказы", nav_seller:"Кабинет продавца",
+    nav_transparency:"Прозрачность", nav_forsellers:"Продавцам",
+    city:"Город доставки", to_city:"в город",
+    hero_h:"Товар — у продавца. Деньги — продавцу.",
+    hero_p:"Оператор не держит складов и не копит вашу выручку. Платёж покупателя расщепляется в момент оплаты: доля продавца уходит на его расчётный счёт, оператору — только комиссия за состоявшуюся сделку.",
+    f_nowarehouse:"Ни одного склада оператора", f_payout:"Деньги продавцу ≤ 24 ч", f_fee:"Одна комиссия 3–8 %", f_regions:"14 регионов, 6 моделей доставки",
+    money_h:"Куда идут деньги покупателя", money_p:"Один и тот же расчёт показывается в карточке товара, в корзине, в чеке заказа и в кабинете продавца. Наведите на сегмент.",
+    seg_seller:"Продавцу", seg_fee:"Комиссия оператора", seg_acq:"Эквайринг", seg_ship:"Перевозчику",
+    of_total:"от суммы заказа", goods:"Товар", delivery:"Доставка", buyer_pays:"Оплатил покупатель", seller_gets:"Зачислено продавцу",
+    popular:"Товары продавцов", all_catalog:"Весь каталог", sellers_regions:"Продавцы по регионам",
+    filters:"Фильтры", category:"Категория", any:"Любая", region:"Регион продавца", price_from:"Цена от", price_to:"до",
+    only_verified:"Только проверенные продавцы", fast_only:"Доставка ≤ 2 дней", sort:"Сортировка",
+    sort_rank:"По ранжированию", sort_price_asc:"Сначала дешевле", sort_price_desc:"Сначала дороже", sort_fast:"Быстрее доставят",
+    found:"Найдено", nothing:"Ничего не найдено. Снимите часть фильтров.", reset_filters:"Сбросить фильтры",
+    why:"Почему этот товар выше?", why_h:"Разложение ранжирования", why_note:"Формула опубликована и одинакова для всех: рекламный бюджет и участие в акциях на органическую выдачу не влияют (принцип П7 ТЗ).",
+    f_relevance:"Релевантность запросу", f_delivery:"Срок доставки в ваш город", f_rating:"Рейтинг продавца", f_sla:"Отгрузки в срок (SLA)", f_price:"Цена с доставкой", f_conv:"Конверсия карточки",
+    to_cart:"В корзину", in_cart:"В корзине", buy:"Купить", days:"дн.", day:"день", verified:"Проверенный продавец",
+    seller:"Продавец", rating:"Рейтинг", sla:"SLA отгрузки", disputes:"Доля споров", since:"На площадке с",
+    same_product:"Тот же товар у других продавцов", delivery_options:"Как получить", returns:"Возврат",
+    returns_text:"14 дней на возврат товара надлежащего качества при сохранении товарного вида. Возврат — тем же способом оплаты; комиссия оператора возвращается продавцу пропорционально.",
+    reviews:"Отзывы", review_note:"Отзыв можно оставить только по доставленному заказу. Оператор не удаляет отзывы по просьбе продавца.",
+    desc:"Описание", specs:"Характеристики", weight_vol:"Объём для расчёта доставки",
+    cart_empty:"Корзина пуста", cart_empty_p:"Заказ собирается по продавцам: у каждого своя доставка, свой срок и своё расщепление платежа.",
+    go_catalog:"Перейти в каталог", cart_h:"Корзина", by_seller:"Заказ разделён по продавцам",
+    remove:"Удалить", qty:"Кол-во", checkout:"Оформить заказ", order_total:"Итого к оплате",
+    checkout_h:"Оформление заказа", address:"Адрес доставки", addr_ph:"Улица, дом, ориентир",
+    name:"Имя", phone:"Телефон", payment:"Способ оплаты", pay_card:"Карта Uzcard / Humo / Visa",
+    pay_qr:"UzQR", pay_install:"Рассрочка банка-партнёра", pay_cod:"Оплата при получении",
+    settle:"Режим расчёта с продавцом", settle_hold:"Защищённый (по умолчанию)", settle_hold_d:"Деньги раскрываются продавцу в течение 24 ч после подтверждения получения. Автоподтверждение — через 72 ч после доставки.",
+    settle_instant:"Мгновенное расщепление", settle_instant_d:"Доступно продавцам с рейтингом ≥ 4,6 и долей споров ≤ 1 %. Деньги уходят продавцу в момент оплаты.",
+    place_order:"Оплатить", order_placed:"Заказ оформлен", order_placed_p:"Платёж расщеплён. Ниже — куда ушли деньги по каждому продавцу.",
+    my_orders:"Мои заказы", no_orders:"Заказов пока нет.", order:"Заказ", from:"от",
+    shipment:"Отправление", track:"Трек", carrier:"Перевозчик", confirm_receipt:"Подтвердить получение",
+    open_dispute:"Открыть спор", dispute:"Спор", advance:"Продвинуть статус (демо)",
+    payout_released:"Деньги раскрыты продавцу", payout_pending:"Ожидает подтверждения получения",
+    money_way:"Движение денег", released_at:"раскрыто",
+    st_paid:"Оплачен", st_confirmed:"Подтверждён продавцом", st_packed:"Собран, вложение зафиксировано",
+    st_handed:"Передан перевозчику", st_transit:"В пути", st_delivered:"Доставлен", st_done:"Завершён", st_disputed:"Спор",
+    seller_cab:"Кабинет продавца", shop:"Магазин", tab_dash:"Показатели", tab_products:"Товары", tab_orders:"Заказы", tab_finance:"Финансы", tab_rating:"Рейтинг и SLA",
+    k_today:"Поступило сегодня", k_hold:"Ожидает раскрытия", k_orders:"Заказов в работе", k_sla:"Отгрузки в срок", k_rating:"Рейтинг",
+    add_product:"Добавить товар", calc:"Калькулятор: сколько вы получите", price_label:"Цена товара, сум",
+    you_get:"Вы получите", commission:"Комиссия", acquiring:"Эквайринг 1 %", publish:"Опубликовать",
+    p_name:"Наименование", p_cat:"Категория", p_vol:"Объём, л", cancel:"Отмена",
+    my_products:"Мои товары", stock:"Остаток", actions:"Действия", unpublish:"Снять с публикации", republish:"Опубликовать снова",
+    orders_todo:"Требуют действия", confirm_order:"Подтвердить заказ", pack:"Собрать и зафиксировать вложение",
+    hand_carrier:"Передать перевозчику", pack_h:"Фиксация вложения", pack_p:"Приложите фото или короткое видео упакованного заказа с читаемым номером отправления. Материал хранится 90 дней и является доказательством в споре.",
+    pack_photo:"Фото упакованного заказа приложено", pack_video:"Видео сборки приложено", label_print:"Печать накладной",
+    choose_carrier:"Выбор перевозчика", price_word:"Стоимость", term:"Срок", pick:"Выбрать",
+    ledger:"Реестр операций", date:"Дата", operation:"Операция", amount:"Сумма", tariff_v:"Версия тарифа",
+    export_csv:"Выгрузить реестр (CSV)", export_note:"Полная выгрузка данных магазина доступна в любой момент — принцип П10 ТЗ.",
+    op_sale:"Продажа", op_fee:"Комиссия оператора", op_acq:"Эквайринг", op_ship:"Доставка", op_refund:"Возврат",
+    rating_h:"Из чего складывается рейтинг", r_service:"Оценка обслуживания", r_sla:"Отгрузки в SLA", r_disputes:"Споры не в вашу пользу", r_reply:"Скорость ответа",
+    transparency:"Прозрачность", t_ranking:"Формула ранжирования", t_tariffs:"Тарифы и версии", t_report:"Публичная отчётность", t_payouts:"Скорость выплат",
+    tariff_now:"Действует сейчас", tariff_next:"Вступает в силу", tariff_note:"Новая версия публикуется не позднее чем за 60 дней и не применяется к уже принятым заказам (принцип П4 ТЗ).",
+    q_report:"Показатели за квартал", m_payout:"Медианный срок поступления денег продавцу", m_ontime:"Доставлено в срок", m_disputes:"Доля заказов со спором", m_forbuyer:"Решений в пользу покупателя", m_forseller:"Решений в пользу продавца",
+    payout_cmp:"Через сколько дней продавец получает деньги", payout_cmp_note:"Сравнение по публичным условиям площадок на сентябрь 2026 года: Amazon — DD+7 после доставки, Wildberries и Ozon — по данным опросов продавцов, Uzum Market — базовый график выплат раз в две недели.",
+    forsellers:"Продавцам", fs_h:"Продавайте со своего склада. Деньги — сразу вам.",
+    fs_p:"Ни поставок на чужой склад, ни очереди на приёмку, ни платы за доступ к собственной выручке.",
+    fs_calc:"Сколько останется вам", fs_here:"На Rasta", fs_classic:"Классический маркетплейс",
+    fs_classic_note:"Оценка по совокупной нагрузке 30 % (комиссия, логистика, хранение, обязательные сервисы).",
+    fs_compare:"Чем это отличается", fs_start:"Стать продавцом",
+    dispute_h:"Спор по заказу", dispute_p:"Процедура состязательная: обе стороны представляют доказательства, решение мотивировано и обжалуемо.",
+    d_step1:"Прямое урегулирование — продавец отвечает в течение 48 ч",
+    d_step2:"Передача арбитру оператора, доказательства сторон — 72 ч",
+    d_step3:"Мотивированное решение со ссылкой на правило — до 5 рабочих дней",
+    d_step4:"Апелляция другому арбитру — 5 дней",
+    d_reason:"Что произошло", d_reason_ph:"Опишите претензию", d_send:"Открыть спор", d_evidence:"Фото или видео приложены",
+    d_opened:"Спор открыт", d_decided:"Решение арбитра", d_refund:"Возврат исполнен, комиссия оператора возвращена продавцу пропорционально",
+    footer_p:"Прототип собран по техническому заданию «Маркетплейс нового поколения» v1.0.",
+    f_principles:"Принципы", f_docs:"Документы", f_p1:"У оператора нет складов", f_p2:"Деньги покупателя идут продавцу напрямую",
+    f_p3:"Одна комиссия, тариф не меняется задним числом", f_p4:"Оператор сам не торгует",
+    f_tz:"ТЗ v1.0", f_research:"Обзор маркетплейсов", f_offer:"Оферта T-2026-01",
+    close:"Закрыть", back:"Назад", model_crs:"Курьерская служба", model_sds:"Курьер продавца", model_psu:"Самовывоз у продавца", model_post:"Почта",
+    pcs:"шт", sum:"сум", free:"бесплатно", tariff_version:"версия тарифа",
+  },
+  uz:{
+    tagline:"omborsiz marketpleys", demo:"<b>Namoyish prototipi</b> — TZ v1.0 asosida. Ma'lumotlar o'quv uchun, to'lovlar amalga oshirilmaydi.",
+    reset:"Demoni tozalash", search:"Mahsulot, sotuvchi yoki turkum", searchBtn:"Qidirish", cart:"Savat",
+    nav_home:"Bosh sahifa", nav_catalog:"Katalog", nav_orders:"Buyurtmalarim", nav_seller:"Sotuvchi kabineti",
+    nav_transparency:"Shaffoflik", nav_forsellers:"Sotuvchilarga", city:"Yetkazish shahri", to_city:"shahriga",
+    hero_h:"Mahsulot — sotuvchida. Pul — sotuvchiga.",
+    hero_p:"Operatorning ombori yo'q va u sizning tushumingizni ushlab turmaydi. To'lov to'lash paytida bo'linadi: sotuvchining ulushi uning hisob raqamiga, operatorga — faqat komissiya.",
+    f_nowarehouse:"Operator ombori yo'q", f_payout:"Pul sotuvchiga ≤ 24 soat", f_fee:"Yagona komissiya 3–8 %", f_regions:"14 hudud, 6 yetkazish modeli",
+    money_h:"Xaridor puli qayerga ketadi", money_p:"Xuddi shu hisob mahsulot sahifasida, savatda, chekda va sotuvchi kabinetida ko'rinadi.",
+    seg_seller:"Sotuvchiga", seg_fee:"Operator komissiyasi", seg_acq:"Ekvayring", seg_ship:"Tashuvchiga",
+    of_total:"buyurtma summasidan", goods:"Mahsulot", delivery:"Yetkazish", buyer_pays:"Xaridor to'ladi", seller_gets:"Sotuvchiga o'tkazildi",
+    popular:"Sotuvchilar mahsulotlari", all_catalog:"Butun katalog", sellers_regions:"Hududlar bo'yicha sotuvchilar",
+    filters:"Filtrlar", category:"Turkum", any:"Har qanday", region:"Sotuvchi hududi", price_from:"Narx", price_to:"gacha",
+    only_verified:"Faqat tekshirilgan sotuvchilar", fast_only:"Yetkazish ≤ 2 kun", sort:"Saralash",
+    sort_rank:"Reyting bo'yicha", sort_price_asc:"Avval arzoni", sort_price_desc:"Avval qimmati", sort_fast:"Tezroq yetkazish",
+    found:"Topildi", nothing:"Hech narsa topilmadi.", reset_filters:"Filtrlarni tozalash",
+    why:"Nega bu mahsulot yuqorida?", why_h:"Saralash tarkibi", why_note:"Formula ochiq va hamma uchun bir xil: reklama byudjeti organik chiqishga ta'sir qilmaydi.",
+    f_relevance:"So'rovga mosligi", f_delivery:"Shahringizga yetkazish muddati", f_rating:"Sotuvchi reytingi", f_sla:"Muddatida jo'natish (SLA)", f_price:"Yetkazish bilan narx", f_conv:"Sahifa konversiyasi",
+    to_cart:"Savatga", in_cart:"Savatda", buy:"Sotib olish", days:"kun", day:"kun", verified:"Tekshirilgan sotuvchi",
+    seller:"Sotuvchi", rating:"Reyting", sla:"Jo'natish SLA", disputes:"Nizolar ulushi", since:"Platformada",
+    same_product:"Shu mahsulot boshqa sotuvchilarda", delivery_options:"Qanday olish mumkin", returns:"Qaytarish",
+    returns_text:"Sifatli mahsulotni 14 kun ichida qaytarish mumkin. Pul o'sha to'lov usuli orqali qaytariladi, komissiya sotuvchiga proporsional qaytariladi.",
+    reviews:"Sharhlar", review_note:"Sharh faqat yetkazilgan buyurtma bo'yicha qoldiriladi.",
+    desc:"Tavsif", specs:"Xususiyatlar", weight_vol:"Yetkazish hisobi uchun hajm",
+    cart_empty:"Savat bo'sh", cart_empty_p:"Buyurtma sotuvchilar bo'yicha ajratiladi: har birida o'z yetkazishi va o'z to'lov taqsimoti.",
+    go_catalog:"Katalogga o'tish", cart_h:"Savat", by_seller:"Buyurtma sotuvchilar bo'yicha bo'lindi",
+    remove:"O'chirish", qty:"Soni", checkout:"Rasmiylashtirish", order_total:"Jami to'lov",
+    checkout_h:"Buyurtmani rasmiylashtirish", address:"Yetkazish manzili", addr_ph:"Ko'cha, uy, mo'ljal",
+    name:"Ism", phone:"Telefon", payment:"To'lov usuli", pay_card:"Uzcard / Humo / Visa kartasi",
+    pay_qr:"UzQR", pay_install:"Hamkor bank muddatli to'lovi", pay_cod:"Olganda to'lash",
+    settle:"Sotuvchi bilan hisob-kitob rejimi", settle_hold:"Himoyalangan (standart)", settle_hold_d:"Pul mahsulot olinganidan keyin 24 soat ichida sotuvchiga ochiladi.",
+    settle_instant:"Bir zumda bo'linish", settle_instant_d:"Reytingi ≥ 4,6 bo'lgan sotuvchilarga. Pul to'lov paytida o'tadi.",
+    place_order:"To'lash", order_placed:"Buyurtma rasmiylashtirildi", order_placed_p:"To'lov bo'lindi. Quyida — pul qayerga ketgani.",
+    my_orders:"Buyurtmalarim", no_orders:"Hozircha buyurtma yo'q.", order:"Buyurtma", from:"sana",
+    shipment:"Jo'natma", track:"Trek", carrier:"Tashuvchi", confirm_receipt:"Olganimni tasdiqlash",
+    open_dispute:"Nizo ochish", dispute:"Nizo", advance:"Holatni surish (demo)",
+    payout_released:"Pul sotuvchiga ochildi", payout_pending:"Tasdiqlash kutilmoqda",
+    money_way:"Pul harakati", released_at:"ochildi",
+    st_paid:"To'landi", st_confirmed:"Sotuvchi tasdiqladi", st_packed:"Yig'ildi, joylash qayd etildi",
+    st_handed:"Tashuvchiga topshirildi", st_transit:"Yo'lda", st_delivered:"Yetkazildi", st_done:"Yakunlandi", st_disputed:"Nizo",
+    seller_cab:"Sotuvchi kabineti", shop:"Do'kon", tab_dash:"Ko'rsatkichlar", tab_products:"Mahsulotlar", tab_orders:"Buyurtmalar", tab_finance:"Moliya", tab_rating:"Reyting va SLA",
+    k_today:"Bugun tushdi", k_hold:"Ochilishi kutilmoqda", k_orders:"Ishdagi buyurtmalar", k_sla:"Muddatida jo'natish", k_rating:"Reyting",
+    add_product:"Mahsulot qo'shish", calc:"Kalkulyator: qancha olasiz", price_label:"Mahsulot narxi, so'm",
+    you_get:"Siz olasiz", commission:"Komissiya", acquiring:"Ekvayring 1 %", publish:"Chop etish",
+    p_name:"Nomi", p_cat:"Turkum", p_vol:"Hajm, l", cancel:"Bekor qilish",
+    my_products:"Mening mahsulotlarim", stock:"Qoldiq", actions:"Amallar", unpublish:"Chop etishdan olish", republish:"Qayta chop etish",
+    orders_todo:"Amal talab qiladi", confirm_order:"Buyurtmani tasdiqlash", pack:"Yig'ish va joylashni qayd etish",
+    hand_carrier:"Tashuvchiga topshirish", pack_h:"Joylashni qayd etish", pack_p:"Jo'natma raqami ko'rinadigan qilib qadoqlangan buyurtma surati yoki qisqa videosini biriktiring. 90 kun saqlanadi.",
+    pack_photo:"Qadoq surati biriktirildi", pack_video:"Yig'ish videosi biriktirildi", label_print:"Yuk xatini chop etish",
+    choose_carrier:"Tashuvchini tanlash", price_word:"Narxi", term:"Muddat", pick:"Tanlash",
+    ledger:"Amallar reestri", date:"Sana", operation:"Amal", amount:"Summa", tariff_v:"Tarif versiyasi",
+    export_csv:"Reestrni yuklab olish (CSV)", export_note:"Do'kon ma'lumotlarini istalgan vaqtda to'liq yuklab olish mumkin.",
+    op_sale:"Sotuv", op_fee:"Operator komissiyasi", op_acq:"Ekvayring", op_ship:"Yetkazish", op_refund:"Qaytarish",
+    rating_h:"Reyting nimalardan tashkil topadi", r_service:"Xizmat bahosi", r_sla:"SLA ichida jo'natish", r_disputes:"Sizga qarshi nizolar", r_reply:"Javob tezligi",
+    transparency:"Shaffoflik", t_ranking:"Saralash formulasi", t_tariffs:"Tariflar va versiyalar", t_report:"Ochiq hisobot", t_payouts:"To'lov tezligi",
+    tariff_now:"Hozir amalda", tariff_next:"Kuchga kiradi", tariff_note:"Yangi versiya 60 kundan kechiktirmay e'lon qilinadi va qabul qilingan buyurtmalarga qo'llanmaydi.",
+    q_report:"Chorak ko'rsatkichlari", m_payout:"Sotuvchiga pul tushishining median muddati", m_ontime:"Muddatida yetkazildi", m_disputes:"Nizoli buyurtmalar ulushi", m_forbuyer:"Xaridor foydasiga qarorlar", m_forseller:"Sotuvchi foydasiga qarorlar",
+    payout_cmp:"Sotuvchi pulni necha kunda oladi", payout_cmp_note:"2026-yil sentabr holatiga ko'ra ochiq shartlar asosida taqqoslash.",
+    forsellers:"Sotuvchilarga", fs_h:"O'z omboringizdan soting. Pul — to'g'ridan-to'g'ri sizga.",
+    fs_p:"Begona omborga yetkazish ham, qabul navbati ham, o'z pulingiz uchun to'lov ham yo'q.",
+    fs_calc:"Sizga qancha qoladi", fs_here:"Rasta'da", fs_classic:"Klassik marketpleys",
+    fs_classic_note:"Umumiy yuk 30 % bo'yicha baholash (komissiya, logistika, saqlash, majburiy xizmatlar).",
+    fs_compare:"Farqi nimada", fs_start:"Sotuvchi bo'lish",
+    dispute_h:"Buyurtma bo'yicha nizo", dispute_p:"Tartib tortishuvli: ikkala tomon dalil taqdim etadi, qaror asoslangan bo'ladi.",
+    d_step1:"To'g'ridan-to'g'ri hal qilish — sotuvchi 48 soatda javob beradi",
+    d_step2:"Operator arbitriga o'tkazish, dalillar — 72 soat",
+    d_step3:"Qoidaga havola bilan asoslangan qaror — 5 ish kunigacha",
+    d_step4:"Boshqa arbitrga apellyatsiya — 5 kun",
+    d_reason:"Nima bo'ldi", d_reason_ph:"Da'voni tasvirlang", d_send:"Nizo ochish", d_evidence:"Surat yoki video biriktirildi",
+    d_opened:"Nizo ochildi", d_decided:"Arbitr qarori", d_refund:"Pul qaytarildi, komissiya sotuvchiga proporsional qaytarildi",
+    footer_p:"Prototip «Yangi avlod marketpleysi» TZ v1.0 asosida yig'ilgan.",
+    f_principles:"Tamoyillar", f_docs:"Hujjatlar", f_p1:"Operatorning ombori yo'q", f_p2:"Xaridor puli to'g'ridan-to'g'ri sotuvchiga",
+    f_p3:"Yagona komissiya, tarif orqaga qarab o'zgarmaydi", f_p4:"Operator o'zi savdo qilmaydi",
+    f_tz:"TZ v1.0", f_research:"Marketpleyslar sharhi", f_offer:"Oferta T-2026-01",
+    close:"Yopish", back:"Orqaga", model_crs:"Kuryerlik xizmati", model_sds:"Sotuvchi kuryeri", model_psu:"Sotuvchidan olib ketish", model_post:"Pochta",
+    pcs:"dona", sum:"so'm", free:"bepul", tariff_version:"tarif versiyasi",
+  },
+  en:{
+    tagline:"a marketplace with no warehouses", demo:"<b>Demo prototype</b> built from TZ v1.0. Sample data, no real payments.",
+    reset:"Reset demo", search:"Search products, sellers, categories", searchBtn:"Search", cart:"Cart",
+    nav_home:"Storefront", nav_catalog:"Catalogue", nav_orders:"My orders", nav_seller:"Seller cabinet",
+    nav_transparency:"Transparency", nav_forsellers:"For sellers", city:"Delivery city", to_city:"to",
+    hero_h:"Goods stay with the seller. Money goes to the seller.",
+    hero_p:"The operator holds no warehouses and never pools your revenue. The buyer's payment is split at the moment of purchase: the seller's share lands on their bank account, the operator keeps only a commission on a completed sale.",
+    f_nowarehouse:"Zero operator warehouses", f_payout:"Seller paid in ≤ 24 h", f_fee:"One fee, 3–8 %", f_regions:"14 regions, 6 delivery models",
+    money_h:"Where the buyer's money goes", money_p:"The same breakdown appears on the product page, in the cart, on the order receipt and in the seller cabinet. Hover a segment.",
+    seg_seller:"To the seller", seg_fee:"Operator commission", seg_acq:"Acquiring", seg_ship:"To the carrier",
+    of_total:"of the order total", goods:"Goods", delivery:"Delivery", buyer_pays:"Buyer paid", seller_gets:"Credited to seller",
+    popular:"From our sellers", all_catalog:"Full catalogue", sellers_regions:"Sellers by region",
+    filters:"Filters", category:"Category", any:"Any", region:"Seller region", price_from:"Price from", price_to:"to",
+    only_verified:"Verified sellers only", fast_only:"Delivery ≤ 2 days", sort:"Sort",
+    sort_rank:"By ranking", sort_price_asc:"Cheapest first", sort_price_desc:"Most expensive first", sort_fast:"Fastest delivery",
+    found:"Found", nothing:"Nothing found. Try removing a filter.", reset_filters:"Reset filters",
+    why:"Why is this ranked higher?", why_h:"Ranking breakdown", why_note:"The formula is published and identical for everyone: ad spend and promo participation do not affect organic ranking (principle P7).",
+    f_relevance:"Query relevance", f_delivery:"Delivery time to your city", f_rating:"Seller rating", f_sla:"On-time dispatch (SLA)", f_price:"Price incl. delivery", f_conv:"Listing conversion",
+    to_cart:"Add to cart", in_cart:"In cart", buy:"Buy", days:"days", day:"day", verified:"Verified seller",
+    seller:"Seller", rating:"Rating", sla:"Dispatch SLA", disputes:"Dispute rate", since:"Selling since",
+    same_product:"Same item from other sellers", delivery_options:"How to receive it", returns:"Returns",
+    returns_text:"14 days to return an item in good condition. Refunds go back through the original payment method; the operator's commission is returned to the seller proportionally.",
+    reviews:"Reviews", review_note:"A review requires a delivered order. The operator does not delete reviews at a seller's request.",
+    desc:"Description", specs:"Specification", weight_vol:"Volume used for delivery pricing",
+    cart_empty:"Your cart is empty", cart_empty_p:"Orders are split per seller: each has its own delivery, its own lead time and its own payment split.",
+    go_catalog:"Browse the catalogue", cart_h:"Cart", by_seller:"Order split by seller",
+    remove:"Remove", qty:"Qty", checkout:"Checkout", order_total:"Total to pay",
+    checkout_h:"Checkout", address:"Delivery address", addr_ph:"Street, building, landmark",
+    name:"Name", phone:"Phone", payment:"Payment method", pay_card:"Uzcard / Humo / Visa card",
+    pay_qr:"UzQR", pay_install:"Partner-bank instalments", pay_cod:"Cash on delivery",
+    settle:"Settlement mode", settle_hold:"Protected (default)", settle_hold_d:"Funds are released to the seller within 24 h of delivery confirmation; auto-confirmation 72 h after delivery.",
+    settle_instant:"Instant split", settle_instant_d:"For sellers rated ≥ 4.6 with a dispute rate ≤ 1 %. Money reaches the seller at the moment of payment.",
+    place_order:"Pay", order_placed:"Order placed", order_placed_p:"The payment has been split. Below is where the money went for each seller.",
+    my_orders:"My orders", no_orders:"No orders yet.", order:"Order", from:"of",
+    shipment:"Shipment", track:"Tracking", carrier:"Carrier", confirm_receipt:"Confirm receipt",
+    open_dispute:"Open a dispute", dispute:"Dispute", advance:"Advance status (demo)",
+    payout_released:"Funds released to the seller", payout_pending:"Awaiting delivery confirmation",
+    money_way:"Money trail", released_at:"released",
+    st_paid:"Paid", st_confirmed:"Confirmed by seller", st_packed:"Packed, contents recorded",
+    st_handed:"Handed to carrier", st_transit:"In transit", st_delivered:"Delivered", st_done:"Completed", st_disputed:"Dispute",
+    seller_cab:"Seller cabinet", shop:"Shop", tab_dash:"Overview", tab_products:"Products", tab_orders:"Orders", tab_finance:"Finance", tab_rating:"Rating & SLA",
+    k_today:"Received today", k_hold:"Awaiting release", k_orders:"Orders in progress", k_sla:"On-time dispatch", k_rating:"Rating",
+    add_product:"Add a product", calc:"Calculator: what you receive", price_label:"Price, UZS",
+    you_get:"You receive", commission:"Commission", acquiring:"Acquiring 1%", publish:"Publish",
+    p_name:"Name", p_cat:"Category", p_vol:"Volume, l", cancel:"Cancel",
+    my_products:"My products", stock:"Stock", actions:"Actions", unpublish:"Unpublish", republish:"Publish again",
+    orders_todo:"Need your action", confirm_order:"Confirm order", pack:"Pack and record contents",
+    hand_carrier:"Hand to carrier", pack_h:"Recording the contents", pack_p:"Attach a photo or short video of the packed order with a readable shipment number. Kept for 90 days as dispute evidence.",
+    pack_photo:"Photo of the packed order attached", pack_video:"Packing video attached", label_print:"Print waybill",
+    choose_carrier:"Choose a carrier", price_word:"Price", term:"Lead time", pick:"Choose",
+    ledger:"Transaction ledger", date:"Date", operation:"Operation", amount:"Amount", tariff_v:"Tariff version",
+    export_csv:"Export ledger (CSV)", export_note:"A full export of the shop's data is available at any time — principle P10.",
+    op_sale:"Sale", op_fee:"Operator commission", op_acq:"Acquiring", op_ship:"Delivery", op_refund:"Refund",
+    rating_h:"How the rating is composed", r_service:"Service score", r_sla:"Dispatch within SLA", r_disputes:"Disputes lost", r_reply:"Reply speed",
+    transparency:"Transparency", t_ranking:"Ranking formula", t_tariffs:"Tariffs and versions", t_report:"Public reporting", t_payouts:"Payout speed",
+    tariff_now:"In force now", tariff_next:"Takes effect", tariff_note:"A new version is published at least 60 days ahead and never applies to orders already accepted (principle P4).",
+    q_report:"Quarterly figures", m_payout:"Median time for money to reach a seller", m_ontime:"Delivered on time", m_disputes:"Orders with a dispute", m_forbuyer:"Decisions for the buyer", m_forseller:"Decisions for the seller",
+    payout_cmp:"Days until the seller has the money", payout_cmp_note:"Compared against publicly stated terms as of September 2026: Amazon DD+7 after delivery, Wildberries and Ozon per seller surveys, Uzum Market's default fortnightly payout.",
+    forsellers:"For sellers", fs_h:"Sell from your own shelf. The money is yours immediately.",
+    fs_p:"No deliveries into someone else's warehouse, no queue at goods-in, no fee for reaching your own revenue.",
+    fs_calc:"What you keep", fs_here:"On Rasta", fs_classic:"A classic marketplace",
+    fs_classic_note:"Estimated at a 30% total load (commission, logistics, storage, mandatory services).",
+    fs_compare:"How this differs", fs_start:"Become a seller",
+    dispute_h:"Order dispute", dispute_p:"The procedure is adversarial: both sides submit evidence, the decision is reasoned and appealable.",
+    d_step1:"Direct settlement — the seller answers within 48 h",
+    d_step2:"Escalation to the operator's arbiter, evidence within 72 h",
+    d_step3:"Reasoned decision citing the rule — within 5 business days",
+    d_step4:"Appeal to a different arbiter — 5 days",
+    d_reason:"What happened", d_reason_ph:"Describe the claim", d_send:"Open dispute", d_evidence:"Photo or video attached",
+    d_opened:"Dispute opened", d_decided:"Arbiter's decision", d_refund:"Refund executed; the operator's commission returned to the seller proportionally",
+    footer_p:"A prototype built from the technical task “Next-generation marketplace”, v1.0.",
+    f_principles:"Principles", f_docs:"Documents", f_p1:"The operator holds no warehouses", f_p2:"The buyer's money goes straight to the seller",
+    f_p3:"One fee; tariffs never change retroactively", f_p4:"The operator does not sell",
+    f_tz:"TZ v1.0", f_research:"Marketplace review", f_offer:"Offer T-2026-01",
+    close:"Close", back:"Back", model_crs:"Courier service", model_sds:"Seller's courier", model_psu:"Pickup at the seller", model_post:"Post",
+    pcs:"pcs", sum:"UZS", free:"free", tariff_version:"tariff version",
+  }
+};
+const t = (k) => (DICT[S.lang] && DICT[S.lang][k]) || DICT.ru[k] || k;
+
+/* ---------------------------- demo data ---------------------------- */
+const REGIONS = {
+  fergana:{ru:"Фергана",uz:"Farg'ona",en:"Fergana"}, namangan:{ru:"Наманган",uz:"Namangan",en:"Namangan"},
+  bukhara:{ru:"Бухара",uz:"Buxoro",en:"Bukhara"}, tashkent:{ru:"Ташкент",uz:"Toshkent",en:"Tashkent"},
+  karakalpak:{ru:"Каракалпакстан",uz:"Qoraqalpog'iston",en:"Karakalpakstan"}, samarkand:{ru:"Самарканд",uz:"Samarqand",en:"Samarkand"}
+};
+const CITIES = ["tashkent","samarkand","namangan","bukhara","karakalpak"];
+const NEAR = {tashkent:["namangan","fergana","samarkand"], samarkand:["bukhara","tashkent"], namangan:["fergana","tashkent"], bukhara:["samarkand"], karakalpak:[], fergana:["namangan","tashkent"]};
+const CATS = {
+  textile:{ru:"Текстиль",uz:"To'qimachilik",en:"Textiles",fee:0.04},
+  ceramics:{ru:"Керамика",uz:"Sopol",en:"Ceramics",fee:0.05},
+  tools:{ru:"Ножи и инструмент",uz:"Pichoq va asbob",en:"Knives & tools",fee:0.06},
+  furniture:{ru:"Мебель",uz:"Mebel",en:"Furniture",fee:0.05},
+  food:{ru:"Продукты",uz:"Oziq-ovqat",en:"Food",fee:0.07}
+};
+const SELLERS = {
+  s1:{name:{ru:"Marg'ilon Ipak",uz:"Marg'ilon Ipak",en:"Marg'ilon Ipak"},city:{ru:"Маргилан",uz:"Marg'ilon",en:"Margilan"},region:"fergana",rating:4.8,sla:97,disp:0.6,verified:true,since:"2024",models:["crs","psu"]},
+  s2:{name:{ru:"Rishton Sopol",uz:"Rishton Sopol",en:"Rishton Sopol"},city:{ru:"Риштан",uz:"Rishton",en:"Rishtan"},region:"fergana",rating:4.7,sla:95,disp:0.9,verified:true,since:"2025",models:["crs"]},
+  s3:{name:{ru:"Chust Pichoq",uz:"Chust Pichoq",en:"Chust Pichoq"},city:{ru:"Чуст",uz:"Chust",en:"Chust"},region:"namangan",rating:4.9,sla:99,disp:0.4,verified:true,since:"2024",models:["crs","psu"]},
+  s4:{name:{ru:"Buxoro Gilam",uz:"Buxoro Gilam",en:"Buxoro Gilam"},city:{ru:"Бухара",uz:"Buxoro",en:"Bukhara"},region:"bukhara",rating:4.6,sla:93,disp:1.4,verified:true,since:"2025",models:["crs","sds"]},
+  s5:{name:{ru:"Toshkent Mebel",uz:"Toshkent Mebel",en:"Toshkent Mebel"},city:{ru:"Ташкент",uz:"Toshkent",en:"Tashkent"},region:"tashkent",rating:4.4,sla:91,disp:2.1,verified:false,since:"2026",models:["sds","psu"]},
+  s6:{name:{ru:"Nukus Agro",uz:"Nukus Agro",en:"Nukus Agro"},city:{ru:"Нукус",uz:"Nukus",en:"Nukus"},region:"karakalpak",rating:4.5,sla:96,disp:1.0,verified:true,since:"2025",models:["crs","post"]}
+};
+const PRODUCTS = [
+  {id:"p1",s:"s1",cat:"textile",price:420000,vol:3,rate:4.8,rev:126,conv:7.2,art:0,
+   n:{ru:"Хан-атлас ручного крашения, отрез 5 м",uz:"Xonatlas, qo'lda bo'yalgan, 5 m",en:"Hand-dyed khan-atlas silk, 5 m cut"},
+   d:{ru:"Маргиланский атлас, натуральный шёлк, крашение растительными красителями. Ширина 90 см.",uz:"Marg'ilon atlasi, tabiiy ipak, o'simlik bo'yoqlari. Eni 90 sm.",en:"Margilan atlas, natural silk, plant dyes. 90 cm wide."}},
+  {id:"p2",s:"s1",cat:"textile",price:1850000,vol:8,rate:4.9,rev:41,conv:5.4,art:1,
+   n:{ru:"Сюзане ручной вышивки 120×160",uz:"Qo'lda tikilgan so'zana 120×160",en:"Hand-embroidered suzani 120×160"},
+   d:{ru:"Ручная вышивка шёлком по хлопку, 4 месяца работы мастерской.",uz:"Paxta ustiga ipak bilan qo'lda tikilgan, 4 oylik ish.",en:"Silk on cotton, four months of workshop time."}},
+  {id:"p3",s:"s1",cat:"textile",price:690000,vol:6,rate:4.6,rev:58,conv:4.1,art:2,
+   n:{ru:"Чапан стёганый, адрас",uz:"Choponi, adras",en:"Quilted chapan coat, adras"},
+   d:{ru:"Традиционный халат, стёганая подкладка, размеры 48–56.",uz:"An'anaviy chopon, qavilgan astar, 48–56 o'lchamlar.",en:"Traditional robe, quilted lining, sizes 48–56."}},
+  {id:"p4",s:"s2",cat:"ceramics",price:320000,vol:5,rate:4.7,rev:93,conv:6.0,art:3,
+   n:{ru:"Ляган риштанский, 42 см",uz:"Rishton lagani, 42 sm",en:"Rishtan lagan platter, 42 cm"},
+   d:{ru:"Ишкоровая глазурь, роспись кобальтом, обжиг в мастерской Риштана.",uz:"Ishqor sirli, kobalt naqsh, Rishton ustaxonasida pishirilgan.",en:"Ishkor glaze, cobalt painting, fired in a Rishtan workshop."}},
+  {id:"p5",s:"s2",cat:"ceramics",price:240000,vol:6,rate:4.5,rev:47,conv:5.2,art:0,
+   n:{ru:"Чайник с шестью пиалами",uz:"Choynak va olti piyola",en:"Teapot with six bowls"},
+   d:{ru:"Комплект для чайханы, ручная роспись.",uz:"Choyxona uchun to'plam, qo'lda bo'yalgan.",en:"A chaikhana set, hand-painted."}},
+  {id:"p6",s:"s3",cat:"tools",price:550000,vol:1,rate:4.9,rev:212,conv:9.1,art:1,
+   n:{ru:"Пчак чустский, дамасская сталь",uz:"Chust pichog'i, damashq po'lati",en:"Chust pchak knife, damascus steel"},
+   d:{ru:"Кованый клинок, рукоять из ореха, ножны из кожи.",uz:"Bolg'alangan tig', yong'oq dastasi, teri qin.",en:"Forged blade, walnut handle, leather sheath."}},
+  {id:"p7",s:"s4",cat:"textile",price:4300000,vol:60,rate:4.8,rev:19,conv:3.2,art:2,
+   n:{ru:"Ковёр «Бухара», шерсть, 2×3 м",uz:"«Buxoro» gilami, jun, 2×3 m",en:"Bukhara wool carpet, 2×3 m"},
+   d:{ru:"Ручное ткачество, 280 000 узлов на м², натуральная шерсть.",uz:"Qo'lda to'qilgan, m² ga 280 000 tugun, tabiiy jun.",en:"Hand-woven, 280,000 knots per m², natural wool."}},
+  {id:"p8",s:"s4",cat:"textile",price:780000,vol:40,rate:4.4,rev:36,conv:4.6,art:3,
+   n:{ru:"Курпача, комплект из 3 шт",uz:"Ko'rpacha, 3 dona to'plam",en:"Kurpacha mats, set of 3"},
+   d:{ru:"Хлопковый наполнитель, чехол из адраса.",uz:"Paxta to'ldirma, adras g'ilof.",en:"Cotton filling, adras cover."}},
+  {id:"p9",s:"s5",cat:"furniture",price:3900000,vol:120,rate:4.3,rev:14,conv:2.8,art:0,
+   n:{ru:"Стол обеденный, дуб, 180 см",uz:"Ovqatlanish stoli, eman, 180 sm",en:"Oak dining table, 180 cm"},
+   d:{ru:"Массив дуба, доставка курьером продавца с подъёмом на этаж.",uz:"Eman massivi, sotuvchi kuryeri qavatga ko'tarib beradi.",en:"Solid oak; the seller's own courier carries it upstairs."}},
+  {id:"p10",s:"s5",cat:"furniture",price:1450000,vol:50,rate:4.2,rev:22,conv:3.5,art:1,
+   n:{ru:"Кресло-качалка, ротанг",uz:"Rotang tebranma kreslo",en:"Rattan rocking chair"},
+   d:{ru:"Натуральный ротанг, подушка в комплекте.",uz:"Tabiiy rotang, yostiq bilan.",en:"Natural rattan, cushion included."}},
+  {id:"p11",s:"s6",cat:"food",price:190000,vol:8,rate:4.7,rev:88,conv:8.4,art:2,
+   n:{ru:"Курага «Кандак», 5 кг",uz:"«Qandak» o'rigi, 5 kg",en:"Kandak dried apricots, 5 kg"},
+   d:{ru:"Урожай 2026 года, сушка в тени, без обработки серой.",uz:"2026-yil hosili, soyada quritilgan, oltingugurtsiz.",en:"2026 harvest, shade-dried, no sulphur."}},
+  {id:"p12",s:"s6",cat:"food",price:145000,vol:8,rate:4.6,rev:54,conv:7.7,art:3,
+   n:{ru:"Гранатовый сок прямого отжима, 6×1 л",uz:"Anor sharbati, 6×1 l",en:"Cold-pressed pomegranate juice, 6×1 l"},
+   d:{ru:"Без сахара и концентрата, стеклянная бутылка.",uz:"Shakarsiz, konsentratsiz, shisha idishda.",en:"No sugar, no concentrate, glass bottles."}}
+];
+const CARRIERS = {
+  bts:{name:"BTS Express", base:12000, perL:900, days:1, rating:4.6},
+  fargo:{name:"Fargo", base:9000, perL:1200, days:2, rating:4.4},
+  post:{name:{ru:"Почта Узбекистана",uz:"O'zbekiston pochtasi",en:"Uzbekistan Post"}, base:6000, perL:500, days:4, rating:4.1},
+  sds:{name:{ru:"Курьер продавца",uz:"Sotuvchi kuryeri",en:"Seller's courier"}, base:15000, perL:0, days:1, rating:4.7},
+  psu:{name:{ru:"Самовывоз у продавца",uz:"Sotuvchidan olib ketish",en:"Pickup at the seller"}, base:0, perL:0, days:0, rating:5.0}
+};
+const TARIFF = {
+  current:{v:"T-2026-01", from:"01.01.2026", fees:{textile:.04,ceramics:.05,tools:.06,furniture:.05,food:.07}},
+  next:{v:"T-2026-02", published:"05.09.2026", from:"04.11.2026", fees:{textile:.04,ceramics:.045,tools:.06,furniture:.05,food:.065}}
+};
+const RANK_WEIGHTS = [["f_relevance",.30],["f_delivery",.22],["f_rating",.18],["f_sla",.15],["f_price",.10],["f_conv",.05]];
+const MY_SHOP = "s1";
+
+/* ---------------------------- state ---------------------------- */
+const STORE_KEY = "rasta.v1";
+const defaultState = () => ({
+  lang:"ru", city:"tashkent", cart:[], orders:[], ledger:[], q:"",
+  filters:{cat:"", region:"", pmin:"", pmax:"", verified:false, fast:false, sort:"rank"},
+  extraProducts:[], unpublished:[], sellerTab:"dash", seeded:false
+});
+let S = defaultState();
+
+function load(){
+  try{ const raw = localStorage.getItem(STORE_KEY); if(raw){ S = Object.assign(defaultState(), JSON.parse(raw)); } }
+  catch(e){ /* private mode or blocked storage: run on defaults */ }
+  if(!S.seeded){ seedDemo(); S.seeded = true; save(); }
+}
+function save(){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(S)); }catch(e){} }
+
+/* ---------------------------- helpers ---------------------------- */
+const $ = (sel, root) => (root||document).querySelector(sel);
+const esc = (s) => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const loc = (o) => (o && typeof o === "object") ? (o[S.lang] || o.ru) : o;
+const fmt = (n) => Math.round(n).toLocaleString("ru-RU").replace(/,/g," ").replace(/ /g," ");
+const money = (n) => fmt(n) + " " + t("sum");
+const pct = (n, d=1) => (n*100).toFixed(d).replace(".",",") + " %";
+const today = () => new Date();
+const dstr = (d) => new Date(d).toLocaleDateString(S.lang==="en"?"en-GB":"ru-RU", {day:"2-digit",month:"2-digit",year:"numeric"});
+const tstr = (d) => new Date(d).toLocaleTimeString(S.lang==="en"?"en-GB":"ru-RU", {hour:"2-digit",minute:"2-digit"});
+const uid = (p) => p + Math.random().toString(36).slice(2,8);
+const allProducts = () => PRODUCTS.concat(S.extraProducts);
+const productById = (id) => allProducts().find(p => p.id === id);
+const feeOf = (cat) => TARIFF.current.fees[cat] ?? 0.05;
+
+function deliveryDays(sellerRegion, city, carrierKey){
+  if(carrierKey === "psu") return 0;
+  const c = CARRIERS[carrierKey] || CARRIERS.bts;
+  let extra = 0;
+  if(sellerRegion !== city) extra = (NEAR[city]||[]).includes(sellerRegion) ? 1 : 2;
+  return c.days + extra;
+}
+function deliveryCost(vol, carrierKey, sellerRegion, city){
+  const c = CARRIERS[carrierKey] || CARRIERS.bts;
+  if(carrierKey === "psu") return 0;
+  if(carrierKey === "sds" && sellerRegion !== city) return 0;
+  const far = sellerRegion === city ? 1 : ((NEAR[city]||[]).includes(sellerRegion) ? 1.15 : 1.35);
+  return Math.round((c.base + c.perL * vol) * far / 500) * 500;
+}
+function carriersFor(sellerId, vol, city){
+  const s = SELLERS[sellerId];
+  const keys = [];
+  if(s.models.includes("crs")) keys.push("bts","fargo");
+  if(s.models.includes("post")) keys.push("post");
+  if(s.models.includes("sds") && s.region === city) keys.push("sds");
+  if(s.models.includes("psu") && s.region === city) keys.push("psu");
+  if(!keys.length) keys.push("bts");
+  return keys.map(k => ({key:k, name:loc(CARRIERS[k].name), cost:deliveryCost(vol,k,s.region,city), days:deliveryDays(s.region,city,k)}));
+}
+function bestCarrier(sellerId, vol, city){
+  const list = carriersFor(sellerId, vol, city).filter(c => c.key !== "psu");
+  return list.sort((a,b) => (a.days - b.days) || (a.cost - b.cost))[0] || carriersFor(sellerId,vol,city)[0];
+}
+/* the split, exactly as in TZ §19.3 */
+function splitOf(goods, delivery, cat){
+  const commission = Math.round(goods * feeOf(cat));
+  const acquiring = Math.round((goods + delivery) * 0.01);
+  const sellerGets = goods - commission - acquiring;
+  return {goods, delivery, commission, acquiring, sellerGets, total: goods + delivery};
+}
+
+/* deterministic geometric artwork per product — no external images */
+function art(idx, seed){
+  const hues = ["var(--brand-2)","var(--tile)","var(--cat-ship)","var(--cat-acq)"];
+  const c = hues[seed % hues.length];
+  const bg = "var(--surface-3)";
+  const motifs = [
+    `<rect width="120" height="90" fill="${bg}"/><g fill="none" stroke="${c}" stroke-width="2"><path d="M60 14l31 31-31 31-31-31z"/><path d="M60 28l17 17-17 17-17-17z"/><circle cx="60" cy="45" r="5" fill="${c}"/></g>`,
+    `<rect width="120" height="90" fill="${bg}"/><g stroke="${c}" stroke-width="2" fill="none"><path d="M18 72q14-46 42-46t42 46"/><path d="M30 72q10-32 30-32t30 32"/></g><circle cx="60" cy="30" r="6" fill="${c}"/>`,
+    `<rect width="120" height="90" fill="${bg}"/><g fill="${c}"><rect x="16" y="20" width="18" height="18" rx="2"/><rect x="51" y="20" width="18" height="18" rx="2" opacity=".65"/><rect x="86" y="20" width="18" height="18" rx="2" opacity=".4"/><rect x="16" y="52" width="18" height="18" rx="2" opacity=".4"/><rect x="51" y="52" width="18" height="18" rx="2"/><rect x="86" y="52" width="18" height="18" rx="2" opacity=".65"/></g>`,
+    `<rect width="120" height="90" fill="${bg}"/><g stroke="${c}" stroke-width="2" fill="none"><path d="M10 45h100M60 8v74"/><path d="M60 20l25 25-25 25-25-25z"/></g><circle cx="60" cy="45" r="8" fill="${c}" opacity=".7"/>`
+  ];
+  return `<svg class="art" viewBox="0 0 120 90" role="img" aria-hidden="true" preserveAspectRatio="xMidYMid slice">${motifs[idx % motifs.length]}</svg>`;
+}
+
+/* ---------------------------- charts ---------------------------- */
+/* stacked proportional split bar — the recurring device */
+function splitBar(sp, opts){
+  opts = opts || {};
+  const segs = [
+    {k:"seg_seller", v:sp.sellerGets, c:"var(--cat-seller)"},
+    {k:"seg_fee", v:sp.commission, c:"var(--cat-fee)"},
+    {k:"seg_acq", v:sp.acquiring, c:"var(--cat-acq)"},
+    {k:"seg_ship", v:sp.delivery, c:"var(--cat-ship)"}
+  ].filter(s => s.v > 0);
+  const total = segs.reduce((a,s) => a + s.v, 0) || 1;
+  const bar = `<div class="splitbar" role="img" aria-label="${esc(t("money_h"))}">` + segs.map(s =>
+    `<span style="flex:${(s.v/total).toFixed(4)};background:${s.c}" data-tip="${esc(t(s.k))}: ${esc(money(s.v))} · ${esc(((s.v/total)*100).toFixed(1).replace(".",","))} %"></span>`).join("") + `</div>`;
+  const legend = opts.legend === false ? "" : `<div class="split-legend">` + segs.map(s =>
+    `<span class="li"><i class="swatch" style="background:${s.c}"></i>${esc(t(s.k))} <b class="num">${esc(fmt(s.v))}</b></span>`).join("") + `</div>`;
+  return bar + legend;
+}
+function splitReceipt(sp, cat){
+  return `<table class="receipt">
+    <tr><td>${esc(t("goods"))}</td><td class="num">${esc(money(sp.goods))}</td></tr>
+    <tr><td>${esc(t("delivery"))}</td><td class="num">${sp.delivery ? esc(money(sp.delivery)) : esc(t("free"))}</td></tr>
+    <tr class="total"><td>${esc(t("buyer_pays"))}</td><td class="num">${esc(money(sp.total))}</td></tr>
+    <tr><td><i class="swatch" style="background:var(--cat-fee);display:inline-block;margin-right:6px"></i>${esc(t("seg_fee"))} · ${esc(pct(feeOf(cat),1))} · <span class="muted">${esc(TARIFF.current.v)}</span></td><td class="num">−${esc(fmt(sp.commission))}</td></tr>
+    <tr><td><i class="swatch" style="background:var(--cat-acq);display:inline-block;margin-right:6px"></i>${esc(t("acquiring"))}</td><td class="num">−${esc(fmt(sp.acquiring))}</td></tr>
+    ${sp.delivery ? `<tr><td><i class="swatch" style="background:var(--cat-ship);display:inline-block;margin-right:6px"></i>${esc(t("seg_ship"))}</td><td class="num">−${esc(fmt(sp.delivery))}</td></tr>` : ""}
+    <tr class="total"><td><i class="swatch" style="background:var(--cat-seller);display:inline-block;margin-right:6px"></i>${esc(t("seller_gets"))}</td><td class="num">${esc(money(sp.sellerGets))}</td></tr>
+  </table>`;
+}
+/* single-series horizontal bars with direct labels */
+function barChart(rows, opts){
+  opts = opts || {};
+  const max = Math.max.apply(null, rows.map(r => r.v)) || 1;
+  return `<div class="bars">` + rows.map(r => `
+    <div class="bar-row${r.hl ? " hl" : ""}">
+      <span>${esc(r.label)}</span>
+      <span class="bar-track"><span class="bar-fill" style="width:${Math.max(2,(r.v/max)*100).toFixed(1)}%"></span></span>
+      <span class="num">${esc(r.text || r.v)}</span>
+    </div>`).join("") + `</div>` + (opts.note ? `<p class="note" style="margin-top:10px">${esc(opts.note)}</p>` : "");
+}
+</script>
+
+<script>
+"use strict";
+/* ---------------------------- demo seed ---------------------------- */
+function mkGroup(sellerId, items, carrierKey, status, daysAgo){
+  const s = SELLERS[sellerId];
+  const vol = items.reduce((a,i) => a + (productById(i.id).vol * i.qty), 0);
+  const cost = deliveryCost(vol, carrierKey, s.region, "tashkent");
+  const goods = items.reduce((a,i) => a + i.price * i.qty, 0);
+  const cat = productById(items[0].id).cat;
+  const at = Date.now() - daysAgo*864e5;
+  const order = ["paid","confirmed","packed","handed","transit","delivered","done"];
+  const events = [];
+  const upto = order.indexOf(status);
+  for(let i = 0; i <= upto; i++) events.push({k:order[i], at: at + i*36e5*8});
+  return {
+    seller:sellerId, items, cat,
+    carrier:{key:carrierKey, name:loc(CARRIERS[carrierKey].name), cost, days:deliveryDays(s.region,"tashkent",carrierKey)},
+    split:splitOf(goods, cost, cat), status, events, tracking:"UZ" + Math.floor(1e8 + Math.random()*9e8),
+    packed:{photo:upto >= 2, video:upto >= 2}, payoutAt: status === "done" ? at + 7*36e5*8 : null, dispute:null
+  };
+}
+function seedOrder(gr, daysAgo, settle){
+  return {id:"R-" + String(100000 + Math.floor(Math.random()*899999)), at: Date.now() - daysAgo*864e5,
+    city:"tashkent", address:"Ташкент, Мирабадский р-н, ул. Афросиаб 12, кв. 7", name:"Зикрилла Р.", phone:"+998 90 123-45-67",
+    pay:"card", settle:settle||"hold", groups:[gr]};
+}
+function seedDemo(){
+  S.orders = [
+    seedOrder(mkGroup("s3",[{id:"p6",qty:1,price:550000}],"bts","transit",3), 3),
+    seedOrder(mkGroup("s2",[{id:"p4",qty:2,price:320000}],"fargo","delivered",6), 6),
+    seedOrder(mkGroup("s1",[{id:"p1",qty:1,price:420000}],"bts","done",3), 3),
+    seedOrder(mkGroup("s1",[{id:"p3",qty:1,price:690000}],"bts","paid",0), 0)
+  ];
+  const done = S.orders[2], g = done.groups[0];
+  const morning = new Date(); morning.setHours(9,40,0,0); g.payoutAt = morning.getTime();
+  S.ledger = [
+    {at:g.payoutAt, order:done.id, kind:"sale", amount:g.split.goods, tariff:TARIFF.current.v},
+    {at:g.payoutAt, order:done.id, kind:"fee", amount:-g.split.commission, tariff:TARIFF.current.v},
+    {at:g.payoutAt, order:done.id, kind:"acq", amount:-g.split.acquiring, tariff:TARIFF.current.v},
+    {at:Date.now()-21*864e5, order:"R-284410", kind:"sale", amount:1850000, tariff:TARIFF.current.v},
+    {at:Date.now()-21*864e5, order:"R-284410", kind:"fee", amount:-74000, tariff:TARIFF.current.v},
+    {at:Date.now()-21*864e5, order:"R-284410", kind:"acq", amount:-18620, tariff:TARIFF.current.v}
+  ];
+}
+
+/* ---------------------------- ranking ---------------------------- */
+function score(p, q){
+  const s = SELLERS[p.s];
+  const car = bestCarrier(p.s, p.vol, S.city);
+  const days = car ? car.days : 3;
+  const rel = q ? (loc(p.n).toLowerCase().includes(q) ? 1 : 0.35) : 0.8;
+  const f = {
+    f_relevance: rel,
+    f_delivery: Math.max(0, 1 - (days - 1) / 6),
+    f_rating: (s.rating - 4) / 1,
+    f_sla: s.sla / 100,
+    f_price: Math.max(0, 1 - (p.price + (car ? car.cost : 0)) / 5000000),
+    f_conv: Math.min(1, p.conv / 10)
+  };
+  let total = 0; RANK_WEIGHTS.forEach(([k,w]) => total += f[k] * w);
+  return {total, f, days, car};
+}
+function visibleProducts(){
+  const q = (S.q || "").trim().toLowerCase();
+  let list = allProducts().filter(p => !S.unpublished.includes(p.id));
+  if(q) list = list.filter(p => (loc(p.n) + " " + loc(SELLERS[p.s].name) + " " + loc(CATS[p.cat])).toLowerCase().includes(q));
+  const F = S.filters;
+  if(F.cat) list = list.filter(p => p.cat === F.cat);
+  if(F.region) list = list.filter(p => SELLERS[p.s].region === F.region);
+  if(F.pmin) list = list.filter(p => p.price >= Number(F.pmin));
+  if(F.pmax) list = list.filter(p => p.price <= Number(F.pmax));
+  if(F.verified) list = list.filter(p => SELLERS[p.s].verified);
+  const scored = list.map(p => ({p, sc:score(p, q)}));
+  const out = F.fast ? scored.filter(x => x.sc.days <= 2) : scored;
+  if(F.sort === "price_asc") out.sort((a,b) => a.p.price - b.p.price);
+  else if(F.sort === "price_desc") out.sort((a,b) => b.p.price - a.p.price);
+  else if(F.sort === "fast") out.sort((a,b) => a.sc.days - b.sc.days || b.sc.total - a.sc.total);
+  else out.sort((a,b) => b.sc.total - a.sc.total);
+  return out;
+}
+
+/* ---------------------------- shared fragments ---------------------------- */
+function sellerLine(sellerId){
+  const s = SELLERS[sellerId];
+  return `<span class="seller">${esc(loc(s.name))} · ${esc(loc(REGIONS[s.region]))}${s.verified ? ` · <span class="verified">✓ ${esc(t("verified"))}</span>` : ""}</span>`;
+}
+function daysWord(n){ return n === 0 ? t("model_psu") : n + " " + (n === 1 ? t("day") : t("days")); }
+function productCard(x){
+  const p = x.p, sc = x.sc, inCart = S.cart.some(c => c.id === p.id);
+  return `<article class="card">
+    <a href="#/p/${p.id}" data-nav aria-label="${esc(loc(p.n))}">${art(p.art, p.price % 4)}</a>
+    <div class="body">
+      <a class="name" href="#/p/${p.id}" data-nav>${esc(loc(p.n))}</a>
+      <span class="price num">${esc(money(p.price))}</span>
+      ${sellerLine(p.s)}
+      <span class="deliv">🚚 ${esc(sc.car ? loc(CARRIERS[sc.car.key].name) : "")} · ${esc(daysWord(sc.days))} ${esc(t("to_city"))} ${esc(loc(REGIONS[S.city]))}</span>
+      <button class="why" data-why="${p.id}">${esc(t("why"))}</button>
+      <div class="foot">
+        <button class="btn small" data-add="${p.id}" ${inCart ? "disabled" : ""}>${esc(inCart ? t("in_cart") : t("to_cart"))}</button>
+        <span class="muted num" style="font-size:12.5px">★ ${p.rate.toFixed(1)} · ${p.rev}</span>
+      </div>
+    </div>
+  </article>`;
+}
+function whyDialog(id){
+  const p = productById(id); if(!p) return;
+  const sc = score(p, (S.q||"").trim().toLowerCase());
+  const rows = RANK_WEIGHTS.map(([k,w]) => ({label:t(k) + " · " + Math.round(w*100) + " %", v:sc.f[k]*w, text:(sc.f[k]*w*100).toFixed(1).replace(".",",")}));
+  openDialog(t("why_h"), `<p class="dim" style="margin-bottom:14px">${esc(loc(p.n))}</p>${barChart(rows)}
+    <p class="note" style="margin-top:14px">${esc(t("why_note"))}</p>`);
+}
+
+/* ---------------------------- views ---------------------------- */
+function viewHome(){
+  const top = visibleProducts().slice(0,8);
+  const demo = splitOf(500000, 25000, "textile");
+  const regionCards = Object.keys(SELLERS).map(id => {
+    const s = SELLERS[id], n = allProducts().filter(p => p.s === id && !S.unpublished.includes(p.id)).length;
+    return `<a class="panel" href="#/catalog?region=${s.region}" data-nav style="display:flex;flex-direction:column;gap:4px;padding:14px 16px">
+      <b style="font-family:var(--f-display)">${esc(loc(s.name))}</b>
+      <span class="muted" style="font-size:12.5px">${esc(loc(s.city))} · ${esc(loc(REGIONS[s.region]))}</span>
+      <span class="num" style="font-size:12.5px">★ ${s.rating.toFixed(1)} · SLA ${s.sla} % · ${n} ${esc(t("pcs"))}</span>
+    </a>`;
+  }).join("");
+  return `
+  <section class="block hero">
+    <div>
+      <span class="eyebrow">${esc(t("f_nowarehouse"))}</span>
+      <h1 style="margin-top:10px">${esc(t("hero_h"))}</h1>
+      <p class="lead">${esc(t("hero_p"))}</p>
+      <div class="hero-facts">
+        <span class="fact">${esc(t("f_payout"))}</span><span class="fact">${esc(t("f_fee"))}</span><span class="fact">${esc(t("f_regions"))}</span>
+      </div>
+      <div class="row gap12" style="margin-top:20px;flex-wrap:wrap">
+        <a class="btn" href="#/catalog" data-nav>${esc(t("all_catalog"))}</a>
+        <a class="btn ghost" href="#/for-sellers" data-nav>${esc(t("fs_start"))}</a>
+      </div>
+    </div>
+    <div class="panel" style="background:var(--surface-2)">
+      <span class="eyebrow">${esc(t("money_h"))}</span>
+      <p class="dim" style="font-size:13.5px;margin:8px 0 14px">${esc(t("money_p"))}</p>
+      ${splitBar(demo)}
+      <div style="margin-top:14px">${splitReceipt(demo, "textile")}</div>
+    </div>
+    <svg class="tilepattern" viewBox="0 0 100 100" aria-hidden="true"><g fill="none" stroke="var(--brand)" stroke-width="1.5"><path d="M50 2l48 48-48 48L2 50z"/><path d="M50 18l32 32-32 32-32-32z"/><path d="M50 34l16 16-16 16-16-16z"/></g></svg>
+  </section>
+
+  <section class="block">
+    <div class="section-head"><h2>${esc(t("popular"))}</h2><a href="#/catalog" data-nav>${esc(t("all_catalog"))} →</a></div>
+    <div class="grid-products">${top.map(productCard).join("")}</div>
+  </section>
+
+  <section class="block">
+    <div class="section-head"><h2>${esc(t("sellers_regions"))}</h2></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">${regionCards}</div>
+  </section>`;
+}
+
+function viewCatalog(){
+  const list = visibleProducts();
+  const F = S.filters;
+  const opt = (v,label,cur) => `<option value="${esc(v)}"${cur===v?" selected":""}>${esc(label)}</option>`;
+  return `
+  <div class="split-side">
+    <aside class="panel" style="position:sticky;top:104px">
+      <h3 style="font-size:16px;margin-bottom:14px">${esc(t("filters"))}</h3>
+      <div class="stack gap12">
+        <label class="field">${esc(t("category"))}
+          <select data-f="cat">${opt("",t("any"),F.cat)}${Object.keys(CATS).map(k => opt(k,loc(CATS[k]),F.cat)).join("")}</select></label>
+        <label class="field">${esc(t("region"))}
+          <select data-f="region">${opt("",t("any"),F.region)}${Object.keys(REGIONS).map(k => opt(k,loc(REGIONS[k]),F.region)).join("")}</select></label>
+        <div class="row gap8">
+          <label class="field" style="flex:1">${esc(t("price_from"))}<input type="number" data-f="pmin" value="${esc(F.pmin)}" min="0" step="10000"></label>
+          <label class="field" style="flex:1">${esc(t("price_to"))}<input type="number" data-f="pmax" value="${esc(F.pmax)}" min="0" step="10000"></label>
+        </div>
+        <label class="checkbox"><input type="checkbox" data-f="verified" ${F.verified?"checked":""}>${esc(t("only_verified"))}</label>
+        <label class="checkbox"><input type="checkbox" data-f="fast" ${F.fast?"checked":""}>${esc(t("fast_only"))} ${esc(t("to_city"))} ${esc(loc(REGIONS[S.city]))}</label>
+        <label class="field">${esc(t("sort"))}
+          <select data-f="sort">${opt("rank",t("sort_rank"),F.sort)}${opt("price_asc",t("sort_price_asc"),F.sort)}${opt("price_desc",t("sort_price_desc"),F.sort)}${opt("fast",t("sort_fast"),F.sort)}</select></label>
+        <button class="btn ghost small" id="resetFilters">${esc(t("reset_filters"))}</button>
+      </div>
+    </aside>
+    <div>
+      <div class="section-head"><h2>${esc(S.q ? `«${S.q}»` : t("all_catalog"))}</h2><span class="muted num">${esc(t("found"))}: ${list.length}</span></div>
+      ${list.length ? `<div class="grid-products">${list.map(productCard).join("")}</div>`
+        : `<div class="panel"><p>${esc(t("nothing"))}</p></div>`}
+    </div>
+  </div>`;
+}
+
+function viewProduct(id){
+  const p = productById(id);
+  if(!p) return `<div class="panel"><p>${esc(t("nothing"))}</p><p style="margin-top:12px"><a href="#/catalog" data-nav>${esc(t("go_catalog"))}</a></p></div>`;
+  const s = SELLERS[p.s], sc = score(p, ""), car = sc.car;
+  const sp = splitOf(p.price, car ? car.cost : 0, p.cat);
+  const others = allProducts().filter(o => o.cat === p.cat && o.id !== p.id && !S.unpublished.includes(o.id)).slice(0,3);
+  const options = carriersFor(p.s, p.vol, S.city).map(c => `
+    <tr><td>${esc(c.name)}</td><td>${esc(daysWord(c.days))}</td><td class="num">${c.cost ? esc(money(c.cost)) : esc(t("free"))}</td></tr>`).join("");
+  const inCart = S.cart.some(c => c.id === p.id);
+  return `
+  <p style="margin-bottom:14px"><a href="#/catalog" data-nav>← ${esc(t("back"))}</a></p>
+  <div class="split-2">
+    <div class="stack gap24">
+      <div class="panel" style="padding:0;overflow:hidden">${art(p.art, p.price % 4)}</div>
+      <div class="panel">
+        <h3 style="font-size:17px;margin-bottom:10px">${esc(t("desc"))}</h3>
+        <p class="dim">${esc(loc(p.d))}</p>
+        <table style="margin-top:16px">
+          <tr><td>${esc(t("category"))}</td><td>${esc(loc(CATS[p.cat]))} · ${esc(t("commission"))} ${esc(pct(feeOf(p.cat),1))}</td></tr>
+          <tr><td>${esc(t("weight_vol"))}</td><td class="num">${p.vol} л</td></tr>
+          <tr><td>${esc(t("seller"))}</td><td>${esc(loc(s.name))}, ${esc(loc(s.city))}</td></tr>
+        </table>
+      </div>
+      <div class="panel">
+        <h3 style="font-size:17px;margin-bottom:10px">${esc(t("delivery_options"))}</h3>
+        <div class="scroll-x"><table>
+          <thead><tr><th>${esc(t("carrier"))}</th><th>${esc(t("term"))}</th><th>${esc(t("price_word"))}</th></tr></thead>
+          <tbody>${options}</tbody></table></div>
+        <p class="note" style="margin-top:10px">${esc(t("f_nowarehouse"))} — ${esc(loc(s.name))} ${S.lang==="en"?"ships from its own workshop in ":"отправляет из своей мастерской, "}${esc(loc(s.city))}.</p>
+      </div>
+      <div class="panel">
+        <h3 style="font-size:17px;margin-bottom:10px">${esc(t("reviews"))} · <span class="num">★ ${p.rate.toFixed(1)}</span> <span class="muted num" style="font-weight:400">(${p.rev})</span></h3>
+        <p class="note">${esc(t("review_note"))}</p>
+      </div>
+    </div>
+    <div class="stack gap16">
+      <div class="panel lift">
+        <h1 style="font-size:22px">${esc(loc(p.n))}</h1>
+        <p class="price num" style="font-size:28px;margin:14px 0 6px">${esc(money(p.price))}</p>
+        <p class="deliv">🚚 ${esc(car ? loc(CARRIERS[car.key].name) : "")} · ${esc(daysWord(sc.days))} ${esc(t("to_city"))} ${esc(loc(REGIONS[S.city]))} · <span class="num">${esc(money(car ? car.cost : 0))}</span></p>
+        <div class="row gap8" style="margin-top:16px">
+          <button class="btn" data-add="${p.id}" ${inCart?"disabled":""} style="flex:1">${esc(inCart ? t("in_cart") : t("to_cart"))}</button>
+          <a class="btn ghost" href="#/cart" data-nav>${esc(t("cart"))}</a>
+        </div>
+      </div>
+      <div class="panel">
+        <span class="eyebrow">${esc(t("money_h"))}</span>
+        <div style="margin:12px 0">${splitBar(sp)}</div>
+        ${splitReceipt(sp, p.cat)}
+      </div>
+      <div class="panel">
+        <h3 style="font-size:16px;margin-bottom:10px">${esc(t("seller"))}</h3>
+        <p><b>${esc(loc(s.name))}</b> ${s.verified ? `<span class="pill good">✓ ${esc(t("verified"))}</span>` : ""}</p>
+        <table style="margin-top:10px">
+          <tr><td>${esc(t("rating"))}</td><td class="num">★ ${s.rating.toFixed(1)}</td></tr>
+          <tr><td>${esc(t("sla"))}</td><td class="num">${s.sla} %</td></tr>
+          <tr><td>${esc(t("disputes"))}</td><td class="num">${String(s.disp).replace(".",",")} %</td></tr>
+          <tr><td>${esc(t("since"))}</td><td class="num">${s.since}</td></tr>
+        </table>
+      </div>
+      <div class="panel">
+        <h3 style="font-size:16px;margin-bottom:8px">${esc(t("returns"))}</h3>
+        <p class="note">${esc(t("returns_text"))}</p>
+      </div>
+      ${others.length ? `<div class="panel"><h3 style="font-size:16px;margin-bottom:10px">${esc(t("same_product"))}</h3>
+        <div class="stack gap12">${others.map(o => `<a class="li-item" href="#/p/${o.id}" data-nav style="color:inherit">
+          <span class="thumb" style="overflow:hidden">${art(o.art, o.price % 4)}</span>
+          <span><span style="display:block">${esc(loc(o.n))}</span>
+          <span class="muted" style="font-size:12.5px">${esc(loc(SELLERS[o.s].name))} · ${esc(daysWord(score(o,"").days))}</span>
+          <b class="num" style="display:block">${esc(money(o.price))}</b></span></a>`).join("")}</div></div>` : ""}
+    </div>
+  </div>`;
+}
+
+function cartGroups(){
+  const by = {};
+  S.cart.forEach(c => {
+    const p = productById(c.id); if(!p) return;
+    (by[p.s] = by[p.s] || []).push({p, qty:c.qty});
+  });
+  return Object.keys(by).map(sid => {
+    const items = by[sid];
+    const vol = items.reduce((a,i) => a + i.p.vol * i.qty, 0);
+    const goods = items.reduce((a,i) => a + i.p.price * i.qty, 0);
+    const car = bestCarrier(sid, vol, S.city);
+    const cat = items[0].p.cat;
+    return {sid, items, vol, goods, car, cat, split:splitOf(goods, car ? car.cost : 0, cat)};
+  });
+}
+function viewCart(){
+  if(!S.cart.length) return `<div class="panel" style="text-align:center;padding:48px 20px">
+    <h2 style="font-size:22px">${esc(t("cart_empty"))}</h2>
+    <p class="dim" style="max-width:52ch;margin:12px auto 20px">${esc(t("cart_empty_p"))}</p>
+    <a class="btn" href="#/catalog" data-nav>${esc(t("go_catalog"))}</a></div>`;
+  const gs = cartGroups();
+  const total = gs.reduce((a,g) => a + g.split.total, 0);
+  return `<div class="section-head"><h2>${esc(t("cart_h"))}</h2><span class="muted">${esc(t("by_seller"))}</span></div>
+  <div class="split-2">
+    <div class="stack gap16">${gs.map(g => `
+      <div class="order-card">
+        <header>
+          <span>${sellerLine(g.sid)}</span>
+          <span class="muted" style="font-size:12.5px">🚚 ${esc(g.car ? loc(CARRIERS[g.car.key].name) : "")} · ${esc(daysWord(g.car ? g.car.days : 0))} · <span class="num">${esc(money(g.car ? g.car.cost : 0))}</span></span>
+        </header>
+        <div class="inner stack gap12">
+          ${g.items.map(i => `<div class="li-item">
+            <span class="thumb" style="overflow:hidden">${art(i.p.art, i.p.price % 4)}</span>
+            <span style="flex:1">
+              <a href="#/p/${i.p.id}" data-nav>${esc(loc(i.p.n))}</a>
+              <span class="muted" style="display:block;font-size:12.5px">${esc(loc(CATS[i.p.cat]))} · ${esc(t("commission"))} ${esc(pct(feeOf(i.p.cat),1))}</span>
+              <span class="row gap8" style="margin-top:6px">
+                <button class="chipbtn" data-qty="${i.p.id}:-1">−</button>
+                <span class="num">${i.qty}</span>
+                <button class="chipbtn" data-qty="${i.p.id}:1">+</button>
+                <button class="why" data-del="${i.p.id}" style="margin-left:8px">${esc(t("remove"))}</button>
+              </span>
+            </span>
+            <b class="num">${esc(money(i.p.price * i.qty))}</b>
+          </div>`).join("")}
+          <div style="border-top:1px dashed var(--line);padding-top:12px">${splitBar(g.split)}</div>
+        </div>
+      </div>`).join("")}
+    </div>
+    <div class="panel lift" style="position:sticky;top:104px">
+      <h3 style="font-size:17px;margin-bottom:12px">${esc(t("order_total"))}</h3>
+      <table class="receipt">
+        ${gs.map(g => `<tr><td>${esc(loc(SELLERS[g.sid].name))}</td><td class="num">${esc(money(g.split.total))}</td></tr>`).join("")}
+        <tr class="total"><td>${esc(t("buyer_pays"))}</td><td class="num">${esc(money(total))}</td></tr>
+      </table>
+      <a class="btn" href="#/checkout" data-nav style="display:block;text-align:center;margin-top:16px">${esc(t("checkout"))}</a>
+      <p class="note" style="margin-top:12px">${esc(t("by_seller"))}: ${gs.length}</p>
+    </div>
+  </div>`;
+}
+
+function viewCheckout(){
+  if(!S.cart.length) return viewCart();
+  const gs = cartGroups();
+  const total = gs.reduce((a,g) => a + g.split.total, 0);
+  const pay = [["card",t("pay_card")],["qr",t("pay_qr")],["install",t("pay_install")],["cod",t("pay_cod")]];
+  return `<div class="section-head"><h2>${esc(t("checkout_h"))}</h2></div>
+  <div class="split-2">
+    <form class="stack gap16" id="checkoutForm">
+      <div class="panel stack gap12">
+        <h3 style="font-size:16px">${esc(t("address"))}</h3>
+        <div class="row gap12" style="flex-wrap:wrap">
+          <label class="field" style="flex:1;min-width:180px">${esc(t("name"))}<input type="text" id="ckName" value="Зикрилла Р." required></label>
+          <label class="field" style="flex:1;min-width:180px">${esc(t("phone"))}<input type="text" id="ckPhone" value="+998 90 123-45-67" required></label>
+        </div>
+        <label class="field">${esc(t("city"))}<select id="ckCity">${CITIES.map(c => `<option value="${c}"${c===S.city?" selected":""}>${esc(loc(REGIONS[c]))}</option>`).join("")}</select></label>
+        <label class="field">${esc(t("address"))}<input type="text" id="ckAddr" placeholder="${esc(t("addr_ph"))}" value="ул. Афросиаб 12, кв. 7, ориентир — чайхана" required></label>
+      </div>
+      <div class="panel stack gap12">
+        <h3 style="font-size:16px">${esc(t("payment"))}</h3>
+        <div class="row gap8" style="flex-wrap:wrap">
+          ${pay.map(([k,l],i) => `<label class="chipbtn"><input type="radio" name="pay" value="${k}"${i===0?" checked":""}> ${esc(l)}</label>`).join("")}
+        </div>
+      </div>
+      <div class="panel stack gap12">
+        <h3 style="font-size:16px">${esc(t("settle"))}</h3>
+        <label class="checkbox"><input type="radio" name="settle" value="hold" checked>
+          <span><b>${esc(t("settle_hold"))}</b><span class="note" style="display:block">${esc(t("settle_hold_d"))}</span></span></label>
+        <label class="checkbox"><input type="radio" name="settle" value="instant">
+          <span><b>${esc(t("settle_instant"))}</b><span class="note" style="display:block">${esc(t("settle_instant_d"))}</span></span></label>
+      </div>
+      <button class="btn" type="submit" style="align-self:flex-start">${esc(t("place_order"))} · <span class="num">${esc(money(total))}</span></button>
+    </form>
+    <div class="stack gap16">
+      ${gs.map(g => `<div class="panel">
+        <div class="row" style="justify-content:space-between;gap:8px;flex-wrap:wrap">
+          <b>${esc(loc(SELLERS[g.sid].name))}</b>
+          <span class="muted" style="font-size:12.5px">${esc(g.car ? loc(CARRIERS[g.car.key].name) : "")} · ${esc(daysWord(g.car ? g.car.days : 0))}</span>
+        </div>
+        <div style="margin:12px 0">${splitBar(g.split)}</div>
+        ${splitReceipt(g.split, g.cat)}
+      </div>`).join("")}
+    </div>
+  </div>`;
+}
+
+/* ---------------------------- orders ---------------------------- */
+const FLOW = ["paid","confirmed","packed","handed","transit","delivered","done"];
+function statusPill(st){
+  const map = {paid:"neutral",confirmed:"neutral",packed:"neutral",handed:"neutral",transit:"warn",delivered:"warn",done:"good",disputed:"bad"};
+  return `<span class="pill ${map[st]||"neutral"}">${esc(t("st_" + st))}</span>`;
+}
+function orderCard(o, asSeller, onlySeller){
+  return o.groups.map((g, gi) => {
+    if(onlySeller && g.seller !== onlySeller) return "";
+    const s = SELLERS[g.seller];
+    const done = FLOW.indexOf(g.status);
+    const tl = FLOW.slice(0, Math.max(1, done + 1)).map((k,i) => {
+      const ev = g.events.find(e => e.k === k);
+      return `<div class="tl ${i < done ? "done" : "now"}"><span class="dot"><i></i></span>
+        <span class="txt"><b>${esc(t("st_" + k))}</b>${ev ? `<span class="muted num" style="display:block;font-size:12px">${esc(dstr(ev.at))} ${esc(tstr(ev.at))}</span>` : ""}</span></div>`;
+    }).reverse().join("");
+    const acts = [];
+    if(asSeller){
+      if(g.status === "paid") acts.push(`<button class="btn small" data-act="confirm:${o.id}:${gi}">${esc(t("confirm_order"))}</button>`);
+      if(g.status === "confirmed") acts.push(`<button class="btn small" data-act="pack:${o.id}:${gi}">${esc(t("pack"))}</button>`);
+      if(g.status === "packed") acts.push(`<button class="btn small" data-act="hand:${o.id}:${gi}">${esc(t("hand_carrier"))}</button>`);
+    } else {
+      if(["paid","confirmed","packed","handed","transit"].includes(g.status)) acts.push(`<button class="btn ghost small" data-act="advance:${o.id}:${gi}">${esc(t("advance"))}</button>`);
+      if(g.status === "delivered") acts.push(`<button class="btn small" data-act="receipt:${o.id}:${gi}">${esc(t("confirm_receipt"))}</button>`);
+      if(["delivered","done"].includes(g.status) && !g.dispute) acts.push(`<button class="btn ghost small" data-act="dispute:${o.id}:${gi}">${esc(t("open_dispute"))}</button>`);
+      if(g.dispute && !g.dispute.decided) acts.push(`<button class="btn small" data-act="decide:${o.id}:${gi}">${esc(t("d_decided"))} (demo)</button>`);
+    }
+    const payout = g.dispute && g.dispute.refunded
+      ? `<span class="pill bad">${esc(t("op_refund"))}</span>`
+      : g.payoutAt ? `<span class="pill good">✓ ${esc(t("payout_released"))} · <span class="num">${esc(dstr(g.payoutAt))} ${esc(tstr(g.payoutAt))}</span></span>`
+      : `<span class="pill warn">${esc(t("k_hold"))}</span>`;
+    return `<article class="order-card">
+      <header>
+        <span><b>${esc(t("order"))} ${esc(o.id)}</b> <span class="muted num">${esc(t("from"))} ${esc(dstr(o.at))}</span></span>
+        <span class="row gap8" style="flex-wrap:wrap">${statusPill(g.dispute && !g.dispute.decided ? "disputed" : g.status)} ${payout}</span>
+      </header>
+      <div class="inner split-2" style="gap:20px">
+        <div class="stack gap12">
+          <div>${sellerLine(g.seller)}</div>
+          ${g.items.map(i => { const p = productById(i.id); return `<div class="li-item">
+            <span class="thumb" style="overflow:hidden">${p ? art(p.art, p.price % 4) : ""}</span>
+            <span style="flex:1">${p ? esc(loc(p.n)) : i.id}<span class="muted" style="display:block;font-size:12.5px">${i.qty} ${esc(t("pcs"))} · <span class="num">${esc(money(i.price*i.qty))}</span></span></span>
+          </div>`; }).join("")}
+          <div class="note">${esc(t("carrier"))}: ${esc(g.carrier.name)} · ${esc(t("track"))} <span class="num">${esc(g.tracking)}</span> · ${esc(loc(SELLERS[g.seller].city))} → ${esc(loc(REGIONS[o.city]))}</div>
+          ${g.dispute ? `<div class="callout"><b>${esc(t("dispute"))}:</b> ${esc(g.dispute.reason)}<br>
+            <span class="note">${g.dispute.decided ? esc(t("d_decided")) + " — " + esc(t("d_refund")) : esc(t("d_step2"))}</span></div>` : ""}
+          <div class="row gap8" style="flex-wrap:wrap">${acts.join("")}</div>
+        </div>
+        <div>
+          <span class="eyebrow">${esc(t("money_way"))}</span>
+          <div style="margin:10px 0">${splitBar(g.split, {legend:false})}</div>
+          ${splitReceipt(g.split, g.cat)}
+          <div class="timeline" style="margin-top:16px">${tl}</div>
+        </div>
+      </div>
+    </article>`;
+  }).join("");
+}
+function viewOrders(){
+  if(!S.orders.length) return `<div class="panel"><p>${esc(t("no_orders"))}</p></div>`;
+  const sorted = S.orders.slice().sort((a,b) => b.at - a.at);
+  return `<div class="section-head"><h2>${esc(t("my_orders"))}</h2><span class="muted num">${sorted.length}</span></div>
+    <div class="stack gap16">${sorted.map(o => orderCard(o, false)).join("")}</div>`;
+}
+
+/* ---------------------------- seller cabinet ---------------------------- */
+function myOrders(){ return S.orders.filter(o => o.groups.some(g => g.seller === MY_SHOP)); }
+function viewSeller(){
+  const s = SELLERS[MY_SHOP];
+  const tabs = [["dash",t("tab_dash")],["products",t("tab_products")],["orders",t("tab_orders")],["finance",t("tab_finance")],["rating",t("tab_rating")]];
+  return `<div class="section-head">
+      <div><span class="eyebrow">${esc(t("seller_cab"))}</span><h2 style="margin-top:6px">${esc(loc(s.name))} ${s.verified ? `<span class="pill good" style="vertical-align:middle">✓ ${esc(t("verified"))}</span>` : ""}</h2></div>
+      <span class="muted">${esc(loc(s.city))} · ${esc(loc(REGIONS[s.region]))}</span>
+    </div>
+    <div class="tabs" role="tablist">${tabs.map(([k,l]) => `<button role="tab" data-tab="${k}" aria-selected="${S.sellerTab===k}">${esc(l)}</button>`).join("")}</div>
+    <div id="sellerPane">${sellerPane()}</div>`;
+}
+function sellerPane(){
+  const s = SELLERS[MY_SHOP], tab = S.sellerTab;
+  const mine = myOrders();
+  const startOfDay = new Date(); startOfDay.setHours(0,0,0,0);
+  const gsMine = [];
+  mine.forEach(o => o.groups.forEach(g => { if(g.seller === MY_SHOP) gsMine.push({o,g}); }));
+  const todaySum = S.ledger.filter(l => l.at >= startOfDay.getTime()).reduce((a,l) => a + l.amount, 0);
+  const holdSum = gsMine.filter(x => !x.g.payoutAt && !(x.g.dispute && x.g.dispute.refunded)).reduce((a,x) => a + x.g.split.sellerGets, 0);
+  const inWork = gsMine.filter(x => !["done"].includes(x.g.status)).length;
+
+  if(tab === "dash"){
+    const todo = gsMine.filter(x => ["paid","confirmed","packed"].includes(x.g.status));
+    const todoOrders = mine.filter(o => o.groups.some(g => g.seller === MY_SHOP && ["paid","confirmed","packed"].includes(g.status)));
+    return `<div class="kpis">
+        <div class="kpi"><span class="eyebrow">${esc(t("k_today"))}</span><span class="v">${esc(money(todaySum))}</span><span class="sub">${esc(t("released_at"))}: ${esc(dstr(Date.now()))}</span></div>
+        <div class="kpi"><span class="eyebrow">${esc(t("k_hold"))}</span><span class="v">${esc(money(holdSum))}</span><span class="sub">${esc(t("settle_hold"))}</span></div>
+        <div class="kpi"><span class="eyebrow">${esc(t("k_orders"))}</span><span class="v">${inWork}</span><span class="sub">${esc(t("orders_todo"))}: ${todo.length}</span></div>
+        <div class="kpi"><span class="eyebrow">${esc(t("k_sla"))}</span><span class="v">${s.sla} %</span><span class="sub">${esc(t("sla"))}</span></div>
+        <div class="kpi"><span class="eyebrow">${esc(t("k_rating"))}</span><span class="v">★ ${s.rating.toFixed(1)}</span><span class="sub">${esc(t("disputes"))}: ${String(s.disp).replace(".",",")} %</span></div>
+      </div>
+      <div class="panel" style="margin-top:20px">
+        <h3 style="font-size:16px;margin-bottom:12px">${esc(t("orders_todo"))}</h3>
+        ${todoOrders.length ? `<div class="stack gap16">${todoOrders.map(o => orderCard(o, true, MY_SHOP)).join("")}</div>`
+          : `<p class="dim">${esc(t("no_orders"))}</p>`}
+      </div>
+      <div class="panel" style="margin-top:20px">
+        <span class="eyebrow">${esc(t("f_nowarehouse"))}</span>
+        <p class="dim" style="margin-top:8px">${esc(t("hero_p"))}</p>
+      </div>`;
+  }
+  if(tab === "products"){
+    const mineP = allProducts().filter(p => p.s === MY_SHOP);
+    return `<div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:14px">
+        <h3 style="font-size:16px">${esc(t("my_products"))}</h3>
+        <button class="btn small" id="addProduct">+ ${esc(t("add_product"))}</button>
+      </div>
+      <div class="panel" style="padding:0;overflow:hidden"><div class="scroll-x"><table>
+        <thead><tr><th>${esc(t("p_name"))}</th><th>${esc(t("category"))}</th><th>${esc(t("price_label"))}</th><th>${esc(t("you_get"))}</th><th>${esc(t("actions"))}</th></tr></thead>
+        <tbody>${mineP.map(p => { const sp = splitOf(p.price, 0, p.cat); const off = S.unpublished.includes(p.id); return `
+          <tr${off ? ` style="opacity:.55"` : ""}>
+            <td><a href="#/p/${p.id}" data-nav>${esc(loc(p.n))}</a>${off ? ` <span class="pill neutral">${esc(t("unpublish"))}</span>` : ""}</td>
+            <td>${esc(loc(CATS[p.cat]))} · ${esc(pct(feeOf(p.cat),1))}</td>
+            <td class="num">${esc(fmt(p.price))}</td>
+            <td class="num"><b>${esc(fmt(sp.sellerGets))}</b></td>
+            <td><button class="btn ghost small" data-toggle="${p.id}">${esc(off ? t("republish") : t("unpublish"))}</button></td>
+          </tr>`; }).join("")}</tbody></table></div></div>
+      <p class="note" style="margin-top:10px">${esc(t("calc"))}: ${esc(t("commission"))} + ${esc(t("acquiring"))}. ${esc(t("tariff_note"))}</p>`;
+  }
+  if(tab === "orders"){
+    return mine.length ? `<div class="stack gap16">${mine.slice().sort((a,b) => b.at - a.at).map(o => orderCard(o, true, MY_SHOP)).join("")}</div>`
+      : `<div class="panel"><p>${esc(t("no_orders"))}</p></div>`;
+  }
+  if(tab === "finance"){
+    const rows = S.ledger.slice().sort((a,b) => b.at - a.at);
+    const kindName = {sale:t("op_sale"), fee:t("op_fee"), acq:t("op_acq"), ship:t("op_ship"), refund:t("op_refund")};
+    const balance = rows.reduce((a,r) => a + r.amount, 0);
+    return `<div class="kpis" style="margin-bottom:18px">
+        <div class="kpi"><span class="eyebrow">${esc(t("k_today"))}</span><span class="v">${esc(money(todaySum))}</span></div>
+        <div class="kpi"><span class="eyebrow">${esc(t("k_hold"))}</span><span class="v">${esc(money(holdSum))}</span></div>
+        <div class="kpi"><span class="eyebrow">${esc(t("ledger"))}</span><span class="v">${esc(money(balance))}</span><span class="sub">${rows.length} ${esc(t("pcs"))}</span></div>
+      </div>
+      <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px">
+        <h3 style="font-size:16px">${esc(t("ledger"))}</h3>
+        <button class="btn ghost small hidden" id="exportCsv">${esc(t("export_csv"))}</button>
+      </div>
+      <div class="panel" style="padding:0;overflow:hidden"><div class="scroll-x"><table>
+        <thead><tr><th>${esc(t("date"))}</th><th>${esc(t("order"))}</th><th>${esc(t("operation"))}</th><th>${esc(t("amount"))}</th><th>${esc(t("tariff_v"))}</th></tr></thead>
+        <tbody>${rows.map(r => `<tr>
+          <td class="num">${esc(dstr(r.at))}</td><td class="num">${esc(r.order)}</td>
+          <td>${esc(kindName[r.kind] || r.kind)}</td>
+          <td class="num" style="color:${r.amount < 0 ? "var(--bad)" : "var(--good)"}">${r.amount < 0 ? "−" : "+"}${esc(fmt(Math.abs(r.amount)))}</td>
+          <td class="num muted">${esc(r.tariff)}</td></tr>`).join("")}</tbody></table></div></div>
+      <p class="note" style="margin-top:10px">${esc(t("export_note"))}</p>`;
+  }
+  const factors = [
+    {label:t("r_service") + " · 40 %", v:0.4*(s.rating/5), text:(s.rating).toFixed(1)},
+    {label:t("r_sla") + " · 30 %", v:0.3*(s.sla/100), text:s.sla + " %"},
+    {label:t("r_disputes") + " · 20 %", v:0.2*(1 - s.disp/100), text:String(s.disp).replace(".",",") + " %"},
+    {label:t("r_reply") + " · 10 %", v:0.1*0.92, text:"2 " + t("day")}
+  ];
+  return `<div class="panel"><h3 style="font-size:16px;margin-bottom:14px">${esc(t("rating_h"))}</h3>
+      ${barChart(factors)}
+      <p class="note" style="margin-top:14px">${esc(t("why_note"))}</p></div>
+    <div class="panel" style="margin-top:16px"><h3 style="font-size:16px;margin-bottom:10px">${esc(t("sla"))}</h3>
+      <p class="dim">${esc(S.lang==="en" ? "Dispatch before 18:00 the next business day. A missed SLA lowers ranking automatically — the operator issues no manual fines." : S.lang==="uz" ? "Keyingi ish kuni soat 18:00 gacha jo'natish. SLA buzilishi saralashni avtomat pasaytiradi — operator qo'lda jarima solmaydi." : "Отгрузка до 18:00 следующего рабочего дня. Нарушение SLA автоматически понижает позицию в выдаче — ручные штрафы оператор не начисляет.")}</p></div>`;
+}
+
+/* ---------------------------- transparency & for sellers ---------------------------- */
+function viewTransparency(){
+  const ranking = RANK_WEIGHTS.map(([k,w]) => ({label:t(k), v:w, text:Math.round(w*100) + " %"}));
+  const payouts = [
+    {label:"Amazon (DD+7)", v:14, text:"7–21 " + t("days")},
+    {label:"Wildberries / Ozon", v:21, text:"14–21 " + t("days")},
+    {label:"Uzum Market", v:14, text:"14 " + t("days")},
+    {label:"Rasta", v:1, text:"≤ 1 " + t("day"), hl:true}
+  ];
+  const feesRow = (k) => `<tr><td>${esc(loc(CATS[k]))}</td><td class="num">${esc(pct(TARIFF.current.fees[k],1))}</td>
+    <td class="num">${esc(pct(TARIFF.next.fees[k],1))}${TARIFF.next.fees[k] < TARIFF.current.fees[k] ? ` <span class="pill good">↓</span>` : ""}</td></tr>`;
+  return `<div class="section-head"><h2>${esc(t("transparency"))}</h2></div>
+  <div class="split-2" style="align-items:start">
+    <div class="stack gap16">
+      <div class="panel"><h3 style="font-size:17px;margin-bottom:12px">${esc(t("t_ranking"))}</h3>
+        ${barChart(ranking)}<p class="note" style="margin-top:12px">${esc(t("why_note"))}</p></div>
+      <div class="panel"><h3 style="font-size:17px;margin-bottom:12px">${esc(t("t_payouts"))}</h3>
+        <p class="dim" style="font-size:13.5px;margin-bottom:12px">${esc(t("payout_cmp"))}</p>
+        ${barChart(payouts, {note:t("payout_cmp_note")})}</div>
+      <div class="panel"><h3 style="font-size:17px;margin-bottom:12px">${esc(t("t_report"))} · ${esc(t("q_report"))}</h3>
+        <div class="scroll-x"><table>
+          <tr><td>${esc(t("m_payout"))}</td><td class="num"><b>18 ч</b></td></tr>
+          <tr><td>${esc(t("m_ontime"))}</td><td class="num"><b>96,2 %</b></td></tr>
+          <tr><td>${esc(t("m_disputes"))}</td><td class="num"><b>1,1 %</b></td></tr>
+          <tr><td>${esc(t("m_forbuyer"))}</td><td class="num"><b>58 %</b></td></tr>
+          <tr><td>${esc(t("m_forseller"))}</td><td class="num"><b>42 %</b></td></tr>
+        </table></div>
+      </div>
+    </div>
+    <div class="stack gap16">
+      <div class="panel">
+        <h3 style="font-size:17px;margin-bottom:12px">${esc(t("t_tariffs"))}</h3>
+        <div class="row gap8" style="margin-bottom:12px;flex-wrap:wrap">
+          <span class="pill good">${esc(t("tariff_now"))}: ${esc(TARIFF.current.v)}</span>
+          <span class="pill warn">${esc(t("tariff_next"))} ${esc(TARIFF.next.from)}: ${esc(TARIFF.next.v)}</span>
+        </div>
+        <div class="scroll-x"><table>
+          <thead><tr><th>${esc(t("category"))}</th><th>${esc(TARIFF.current.v)}</th><th>${esc(TARIFF.next.v)}</th></tr></thead>
+          <tbody>${Object.keys(CATS).map(feesRow).join("")}</tbody></table></div>
+        <p class="note" style="margin-top:12px">${esc(t("tariff_note"))}</p>
+      </div>
+      <div class="panel">
+        <h3 style="font-size:17px;margin-bottom:10px">${esc(t("dispute_h"))}</h3>
+        <p class="dim" style="font-size:13.5px;margin-bottom:12px">${esc(t("dispute_p"))}</p>
+        <div class="steps">
+          ${[1,2,3,4].map(i => `<div class="step"><span class="n">${i}</span><span>${esc(t("d_step"+i))}</span></div>`).join("")}
+        </div>
+      </div>
+      <div class="panel">
+        <h3 style="font-size:17px;margin-bottom:10px">${esc(t("f_principles"))}</h3>
+        <ul class="stack gap8" style="margin:0;padding-left:18px">
+          <li>${esc(t("f_p1"))}</li><li>${esc(t("f_p2"))}</li><li>${esc(t("f_p3"))}</li><li>${esc(t("f_p4"))}</li>
+        </ul>
+      </div>
+    </div>
+  </div>`;
+}
+function viewForSellers(){
+  const price = 1000000, cat = "textile";
+  const sp = splitOf(price, 0, cat);
+  const classic = Math.round(price * 0.70);
+  const cmp = [
+    {label:t("fs_here"), v:sp.sellerGets, text:money(sp.sellerGets), hl:true},
+    {label:t("fs_classic"), v:classic, text:money(classic)}
+  ];
+  const rows = [
+    [t("f_nowarehouse"), "—", "✓"],
+    [S.lang==="en"?"Money reaches the seller":"Деньги доходят до продавца", "14–21 " + t("days"), "≤ 24 ч"],
+    [S.lang==="en"?"Fee for withdrawing your own revenue":"Плата за вывод своей выручки", "1–2,5 %", "0 %"],
+    [S.lang==="en"?"Retroactive tariff changes":"Изменение тарифа задним числом", S.lang==="en"?"happens":"случается", S.lang==="en"?"forbidden, 60 days notice":"запрещено, 60 дней"],
+    [S.lang==="en"?"Manual fines":"Ручные штрафы", S.lang==="en"?"yes":"есть", S.lang==="en"?"none, SLA only":"нет, только SLA"],
+    [S.lang==="en"?"Operator sells its own goods":"Оператор торгует сам", S.lang==="en"?"yes":"да", S.lang==="en"?"no":"нет"]
+  ];
+  return `<section class="block hero">
+      <div>
+        <span class="eyebrow">${esc(t("forsellers"))}</span>
+        <h1 style="margin-top:10px">${esc(t("fs_h"))}</h1>
+        <p class="lead">${esc(t("fs_p"))}</p>
+        <div class="row gap12" style="margin-top:18px;flex-wrap:wrap">
+          <a class="btn" href="#/seller" data-nav>${esc(t("seller_cab"))}</a>
+          <a class="btn ghost" href="#/transparency" data-nav>${esc(t("t_tariffs"))}</a>
+        </div>
+      </div>
+      <div class="panel" style="background:var(--surface-2)">
+        <span class="eyebrow">${esc(t("fs_calc"))}</span>
+        <label class="field" style="margin:12px 0">${esc(t("price_label"))}
+          <input type="number" id="fsPrice" value="${price}" min="10000" step="50000"></label>
+        <label class="field">${esc(t("p_cat"))}
+          <select id="fsCat">${Object.keys(CATS).map(k => `<option value="${k}"${k===cat?" selected":""}>${esc(loc(CATS[k]))} · ${esc(pct(CATS[k].fee,1))}</option>`).join("")}</select></label>
+        <div id="fsOut" style="margin-top:16px">${barChart(cmp, {note:t("fs_classic_note")})}</div>
+      </div>
+    </section>
+    <section class="block">
+      <div class="section-head"><h2>${esc(t("fs_compare"))}</h2></div>
+      <div class="panel" style="padding:0;overflow:hidden"><div class="scroll-x"><table>
+        <thead><tr><th></th><th>${esc(t("fs_classic"))}</th><th>Rasta</th></tr></thead>
+        <tbody>${rows.map(r => `<tr><td>${esc(r[0])}</td><td class="muted">${esc(r[1])}</td><td><b>${esc(r[2])}</b></td></tr>`).join("")}</tbody>
+      </table></div></div>
+    </section>`;
+}
+</script>
+
+<script>
+"use strict";
+/* ---------------------------- dialog & tooltip ---------------------------- */
+const dlg = document.getElementById("dlg");
+function openDialog(title, html, onMount){
+  document.getElementById("dlgTitle").textContent = title;
+  const body = document.getElementById("dlgBody");
+  body.innerHTML = html;
+  if(!dlg.open) dlg.showModal();
+  if(onMount) onMount(body);
+}
+document.getElementById("dlgClose").addEventListener("click", () => dlg.close());
+const tipEl = document.getElementById("tip");
+document.addEventListener("mouseover", (e) => {
+  const el = e.target.closest("[data-tip]");
+  if(!el){ tipEl.classList.add("hidden"); return; }
+  tipEl.textContent = el.getAttribute("data-tip");
+  tipEl.classList.remove("hidden");
+});
+document.addEventListener("mousemove", (e) => {
+  if(tipEl.classList.contains("hidden")) return;
+  const pad = 14, w = tipEl.offsetWidth, h = tipEl.offsetHeight;
+  tipEl.style.left = Math.min(window.innerWidth - w - 8, e.clientX + pad) + "px";
+  tipEl.style.top = Math.max(8, e.clientY - h - pad) + "px";
+});
+
+/* ---------------------------- cart & orders ---------------------------- */
+function addToCart(id){
+  const line = S.cart.find(c => c.id === id);
+  if(line) line.qty++; else S.cart.push({id, qty:1});
+  save(); renderAll();
+}
+function eligibleInstant(sellerId){ const s = SELLERS[sellerId]; return s.rating >= 4.6 && s.disp <= 1; }
+function pushLedger(entries){ S.ledger = S.ledger.concat(entries); }
+function releasePayout(o, g){
+  if(g.payoutAt) return;
+  g.payoutAt = Date.now();
+  if(g.seller === MY_SHOP){
+    pushLedger([
+      {at:g.payoutAt, order:o.id, kind:"sale", amount:g.split.goods, tariff:TARIFF.current.v},
+      {at:g.payoutAt, order:o.id, kind:"fee", amount:-g.split.commission, tariff:TARIFF.current.v},
+      {at:g.payoutAt, order:o.id, kind:"acq", amount:-g.split.acquiring, tariff:TARIFF.current.v}
+    ]);
+  }
+}
+function createOrder(form){
+  const gs = cartGroups();
+  const settle = form.settle;
+  const groups = gs.map(g => {
+    const instant = settle === "instant" && eligibleInstant(g.sid);
+    return {
+      seller:g.sid, cat:g.cat, items:g.items.map(i => ({id:i.p.id, qty:i.qty, price:i.p.price})),
+      carrier:{key:g.car.key, name:loc(CARRIERS[g.car.key].name), cost:g.car.cost, days:g.car.days},
+      split:g.split, status:"paid", events:[{k:"paid", at:Date.now()}],
+      tracking:"UZ" + Math.floor(1e8 + Math.random()*9e8), packed:{photo:false, video:false},
+      payoutAt: instant ? Date.now() : null, dispute:null, instant
+    };
+  });
+  const o = {id:"R-" + String(100000 + Math.floor(Math.random()*899999)), at:Date.now(), city:form.city,
+    address:form.addr, name:form.name, phone:form.phone, pay:form.pay, settle, groups};
+  groups.forEach(g => { if(g.payoutAt && g.seller === MY_SHOP){
+    pushLedger([
+      {at:g.payoutAt, order:o.id, kind:"sale", amount:g.split.goods, tariff:TARIFF.current.v},
+      {at:g.payoutAt, order:o.id, kind:"fee", amount:-g.split.commission, tariff:TARIFF.current.v},
+      {at:g.payoutAt, order:o.id, kind:"acq", amount:-g.split.acquiring, tariff:TARIFF.current.v}
+    ]);
+  }});
+  S.orders.unshift(o); S.cart = []; save();
+  location.hash = "#/orders";
+  renderAll();
+  openDialog(t("order_placed"), `<p class="dim" style="margin-bottom:14px">${esc(t("order_placed_p"))}</p>
+    ${groups.map(g => `<div style="margin-bottom:16px">
+      <div class="row" style="justify-content:space-between;gap:8px;flex-wrap:wrap">
+        <b>${esc(loc(SELLERS[g.seller].name))}</b>
+        <span class="pill ${g.payoutAt ? "good" : "warn"}">${esc(g.payoutAt ? t("payout_released") : t("payout_pending"))}</span>
+      </div>
+      <div style="margin:10px 0">${splitBar(g.split)}</div>
+    </div>`).join("")}
+    <p class="note">${esc(t("order"))} ${esc(o.id)} · ${esc(t("settle"))}: ${esc(settle === "instant" ? t("settle_instant") : t("settle_hold"))}</p>`);
+}
+function findGroup(oid, gi){
+  const o = S.orders.find(x => x.id === oid);
+  return o ? {o, g:o.groups[Number(gi)]} : {};
+}
+function stamp(g, k){ if(!g.events.some(e => e.k === k)) g.events.push({k, at:Date.now()}); g.status = k; }
+
+function actOn(cmd){
+  const [act, oid, gi] = cmd.split(":");
+  const {o, g} = findGroup(oid, gi);
+  if(!o || !g) return;
+  if(act === "confirm"){ stamp(g, "confirmed"); save(); renderAll(); return; }
+  if(act === "pack"){
+    openDialog(t("pack_h"), `<p class="dim" style="margin-bottom:14px">${esc(t("pack_p"))}</p>
+      <div class="stack gap8">
+        <label class="checkbox"><input type="checkbox" id="pkPhoto">${esc(t("pack_photo"))}</label>
+        <label class="checkbox"><input type="checkbox" id="pkVideo">${esc(t("pack_video"))}</label>
+      </div>
+      <p class="note" style="margin-top:12px">${esc(t("track"))}: <span class="num">${esc(g.tracking)}</span></p>
+      <div class="row gap8" style="margin-top:18px"><button class="btn" id="pkOk" disabled>${esc(t("pack"))}</button>
+      <button class="btn ghost" id="pkCancel">${esc(t("cancel"))}</button></div>`, (body) => {
+      const ph = body.querySelector("#pkPhoto"), vi = body.querySelector("#pkVideo"), ok = body.querySelector("#pkOk");
+      const upd = () => { ok.disabled = !ph.checked; };
+      ph.addEventListener("change", upd); vi.addEventListener("change", upd);
+      body.querySelector("#pkCancel").addEventListener("click", () => dlg.close());
+      ok.addEventListener("click", () => {
+        g.packed = {photo:ph.checked, video:vi.checked};
+        stamp(g, "packed"); save(); dlg.close(); renderAll();
+      });
+    });
+    return;
+  }
+  if(act === "hand"){
+    const vol = g.items.reduce((a,i) => { const p = productById(i.id); return a + (p ? p.vol * i.qty : 0); }, 0);
+    const list = carriersFor(g.seller, vol, o.city).filter(c => c.key !== "psu");
+    openDialog(t("choose_carrier"), `<div class="scroll-x"><table>
+        <thead><tr><th>${esc(t("carrier"))}</th><th>${esc(t("term"))}</th><th>${esc(t("price_word"))}</th><th></th></tr></thead>
+        <tbody>${list.map(c => `<tr><td>${esc(c.name)}</td><td>${esc(daysWord(c.days))}</td><td class="num">${esc(money(c.cost))}</td>
+          <td><button class="btn small" data-carrier="${c.key}">${esc(t("pick"))}</button></td></tr>`).join("")}</tbody></table></div>
+      <p class="note" style="margin-top:12px">${esc(t("label_print"))} · ${esc(t("track"))} <span class="num">${esc(g.tracking)}</span></p>`, (body) => {
+      body.querySelectorAll("[data-carrier]").forEach(btn => btn.addEventListener("click", () => {
+        const key = btn.getAttribute("data-carrier");
+        const c = list.find(x => x.key === key);
+        g.carrier = {key, name:c.name, cost:c.cost, days:c.days};
+        stamp(g, "handed"); save(); dlg.close(); renderAll();
+      }));
+    });
+    return;
+  }
+  if(act === "advance"){
+    const i = FLOW.indexOf(g.status);
+    if(i >= 0 && i < FLOW.indexOf("delivered")) stamp(g, FLOW[i+1]);
+    save(); renderAll(); return;
+  }
+  if(act === "receipt"){
+    stamp(g, "done"); releasePayout(o, g); save(); renderAll();
+    openDialog(t("payout_released"), `<p class="dim" style="margin-bottom:14px">${esc(t("settle_hold_d"))}</p>
+      ${splitBar(g.split)}
+      <p class="note" style="margin-top:14px">${esc(t("seller_gets"))}: <b class="num">${esc(money(g.split.sellerGets))}</b> · ${esc(t("released_at"))} ${esc(dstr(g.payoutAt))} ${esc(tstr(g.payoutAt))}</p>`);
+    return;
+  }
+  if(act === "dispute"){
+    openDialog(t("dispute_h"), `<p class="dim" style="margin-bottom:14px">${esc(t("dispute_p"))}</p>
+      <div class="steps" style="margin-bottom:16px">${[1,2,3,4].map(i => `<div class="step"><span class="n">${i}</span><span>${esc(t("d_step"+i))}</span></div>`).join("")}</div>
+      <label class="field">${esc(t("d_reason"))}<textarea id="dpReason" placeholder="${esc(t("d_reason_ph"))}"></textarea></label>
+      <label class="checkbox" style="margin-top:10px"><input type="checkbox" id="dpEv">${esc(t("d_evidence"))}</label>
+      <div class="row gap8" style="margin-top:18px"><button class="btn" id="dpOk">${esc(t("d_send"))}</button>
+      <button class="btn ghost" id="dpCancel">${esc(t("cancel"))}</button></div>`, (body) => {
+      body.querySelector("#dpCancel").addEventListener("click", () => dlg.close());
+      body.querySelector("#dpOk").addEventListener("click", () => {
+        const reason = (body.querySelector("#dpReason").value || t("d_reason_ph")).slice(0,200);
+        g.dispute = {reason, at:Date.now(), evidence:body.querySelector("#dpEv").checked, decided:false, refunded:false};
+        save(); dlg.close(); renderAll();
+      });
+    });
+    return;
+  }
+  if(act === "decide"){
+    g.dispute.decided = true; g.dispute.refunded = true;
+    if(g.seller === MY_SHOP && g.payoutAt){
+      pushLedger([
+        {at:Date.now(), order:o.id, kind:"refund", amount:-g.split.sellerGets, tariff:TARIFF.current.v},
+        {at:Date.now(), order:o.id, kind:"fee", amount:g.split.commission, tariff:TARIFF.current.v}
+      ]);
+    }
+    save(); renderAll();
+    openDialog(t("d_decided"), `<p class="dim">${esc(t("d_refund"))}</p>
+      <p class="note" style="margin-top:12px">${esc(t("order"))} ${esc(o.id)} · ${esc(t("amount"))}: <b class="num">${esc(money(g.split.total))}</b></p>`);
+    return;
+  }
+}
+
+/* ---------------------------- product form & export ---------------------------- */
+function addProductDialog(){
+  openDialog(t("add_product"), `
+    <div class="stack gap12">
+      <label class="field">${esc(t("p_name"))}<input type="text" id="npName" value="Курта из адраса, ручной пошив"></label>
+      <div class="row gap12">
+        <label class="field" style="flex:1">${esc(t("p_cat"))}
+          <select id="npCat">${Object.keys(CATS).map(k => `<option value="${k}">${esc(loc(CATS[k]))} · ${esc(pct(CATS[k].fee,1))}</option>`).join("")}</select></label>
+        <label class="field" style="flex:1">${esc(t("p_vol"))}<input type="number" id="npVol" value="4" min="1"></label>
+      </div>
+      <label class="field">${esc(t("price_label"))}<input type="number" id="npPrice" value="450000" step="10000" min="10000"></label>
+      <div class="panel flat" style="background:var(--surface-2)">
+        <span class="eyebrow">${esc(t("calc"))}</span>
+        <div id="npCalc" style="margin-top:10px"></div>
+      </div>
+      <div class="row gap8"><button class="btn" id="npOk">${esc(t("publish"))}</button>
+      <button class="btn ghost" id="npCancel">${esc(t("cancel"))}</button></div>
+    </div>`, (body) => {
+    const price = body.querySelector("#npPrice"), cat = body.querySelector("#npCat"), calc = body.querySelector("#npCalc");
+    const upd = () => {
+      const sp = splitOf(Math.max(0, Number(price.value) || 0), 0, cat.value);
+      calc.innerHTML = splitBar(sp) + splitReceipt(sp, cat.value);
+    };
+    price.addEventListener("input", upd); cat.addEventListener("change", upd); upd();
+    body.querySelector("#npCancel").addEventListener("click", () => dlg.close());
+    body.querySelector("#npOk").addEventListener("click", () => {
+      const nm = body.querySelector("#npName").value.trim() || "Новый товар";
+      const p = {id:uid("np"), s:MY_SHOP, cat:cat.value, price:Math.max(10000, Number(price.value)||10000),
+        vol:Math.max(1, Number(body.querySelector("#npVol").value)||1), rate:5, rev:0, conv:5, art:2,
+        n:{ru:nm, uz:nm, en:nm}, d:{ru:"Товар добавлен в демо-режиме.", uz:"Mahsulot demo rejimida qo'shildi.", en:"Added in demo mode."}};
+      S.extraProducts.push(p); save(); dlg.close(); renderAll();
+    });
+  });
+}
+async function setupExport(){
+  const btn = document.getElementById("exportCsv");
+  if(!btn || !window.claude || !window.claude.use) return;
+  let dl = null;
+  try{ dl = await claude.use("downloads"); }catch(e){ dl = null; }
+  if(!dl) return;
+  btn.classList.remove("hidden");
+  btn.addEventListener("click", async () => {
+    const head = ["date","order","operation","amount","tariff"].join(";");
+    const kindName = {sale:t("op_sale"), fee:t("op_fee"), acq:t("op_acq"), ship:t("op_ship"), refund:t("op_refund")};
+    const body = S.ledger.slice().sort((a,b) => b.at - a.at)
+      .map(r => [dstr(r.at), r.order, kindName[r.kind] || r.kind, r.amount, r.tariff].join(";")).join("\n");
+    try{ await dl.save({filename:"rasta-ledger.csv", data:"﻿" + head + "\n" + body}); }catch(e){}
+  });
+}
+
+/* ---------------------------- chrome & router ---------------------------- */
+const ROUTES = [["#/", "nav_home"],["#/catalog","nav_catalog"],["#/orders","nav_orders"],["#/seller","nav_seller"],["#/transparency","nav_transparency"],["#/for-sellers","nav_forsellers"]];
+function renderChrome(){
+  document.documentElement.lang = S.lang;
+  document.getElementById("demoNote").innerHTML = t("demo");
+  document.getElementById("resetDemo").textContent = t("reset");
+  document.getElementById("brandSub").textContent = t("tagline");
+  const q = document.getElementById("q");
+  q.placeholder = t("search"); q.value = S.q || "";
+  document.getElementById("searchBtn").textContent = t("searchBtn");
+  document.querySelector("#cartLink .cart-label").textContent = t("cart");
+  const count = S.cart.reduce((a,c) => a + c.qty, 0);
+  const badge = document.getElementById("cartCount");
+  badge.textContent = count; badge.classList.toggle("hidden", count === 0);
+  const city = document.getElementById("city");
+  city.innerHTML = CITIES.map(c => `<option value="${c}"${c === S.city ? " selected" : ""}>${esc(loc(REGIONS[c]))}</option>`).join("");
+  city.title = t("city");
+  document.querySelectorAll(".langs button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.lang === S.lang)));
+  const route = currentRoute();
+  document.getElementById("nav").innerHTML = ROUTES.map(([h,k]) =>
+    `<a href="${h}" data-nav${route === h ? ' aria-current="page"' : ""}>${esc(t(k))}</a>`).join("");
+  document.getElementById("footer").innerHTML = `
+    <div>
+      <div class="brand" style="margin-bottom:10px"><span class="brand-name">Rasta</span></div>
+      <p>${esc(t("footer_p"))}</p>
+      <p class="note" style="margin-top:8px">${esc(t("tagline"))} · Toshkent, 2026</p>
+    </div>
+    <div><b style="display:block;margin-bottom:8px">${esc(t("f_principles"))}</b>
+      <p>${esc(t("f_p1"))}</p><p>${esc(t("f_p2"))}</p><p>${esc(t("f_p3"))}</p><p>${esc(t("f_p4"))}</p></div>
+    <div><b style="display:block;margin-bottom:8px">${esc(t("f_docs"))}</b>
+      <p>${esc(t("f_tz"))}</p><p>${esc(t("f_research"))}</p><p>${esc(t("f_offer"))} · ${esc(TARIFF.current.from)}</p></div>`;
+}
+function currentRoute(){
+  const h = location.hash || "#/";
+  if(h.startsWith("#/p/")) return "#/catalog";
+  return h.split("?")[0];
+}
+function renderView(){
+  const h = location.hash || "#/";
+  const [path, query] = h.split("?");
+  if(query){
+    const qp = new URLSearchParams(query);
+    if(qp.get("region")){ S.filters.region = qp.get("region"); }
+  }
+  const view = document.getElementById("view");
+  if(path.startsWith("#/p/")) view.innerHTML = viewProduct(path.slice(4));
+  else if(path === "#/catalog") view.innerHTML = viewCatalog();
+  else if(path === "#/cart") view.innerHTML = viewCart();
+  else if(path === "#/checkout") view.innerHTML = viewCheckout();
+  else if(path === "#/orders") view.innerHTML = viewOrders();
+  else if(path === "#/seller") view.innerHTML = viewSeller();
+  else if(path === "#/transparency") view.innerHTML = viewTransparency();
+  else if(path === "#/for-sellers") view.innerHTML = viewForSellers();
+  else view.innerHTML = viewHome();
+  if(path === "#/seller" && S.sellerTab === "finance") setupExport();
+}
+function renderAll(){ renderChrome(); renderView(); }
+
+/* events */
+document.addEventListener("click", (e) => {
+  const el = e.target;
+  const add = el.closest("[data-add]");
+  if(add){ addToCart(add.getAttribute("data-add")); return; }
+  const why = el.closest("[data-why]");
+  if(why){ whyDialog(why.getAttribute("data-why")); return; }
+  const qty = el.closest("[data-qty]");
+  if(qty){
+    const [id, d] = qty.getAttribute("data-qty").split(":");
+    const line = S.cart.find(c => c.id === id);
+    if(line){ line.qty = Math.max(1, line.qty + Number(d)); save(); renderAll(); }
+    return;
+  }
+  const del = el.closest("[data-del]");
+  if(del){ S.cart = S.cart.filter(c => c.id !== del.getAttribute("data-del")); save(); renderAll(); return; }
+  const act = el.closest("[data-act]");
+  if(act){ actOn(act.getAttribute("data-act")); return; }
+  const tab = el.closest("[data-tab]");
+  if(tab){ S.sellerTab = tab.getAttribute("data-tab"); save(); renderAll(); return; }
+  const tg = el.closest("[data-toggle]");
+  if(tg){
+    const id = tg.getAttribute("data-toggle");
+    S.unpublished = S.unpublished.includes(id) ? S.unpublished.filter(x => x !== id) : S.unpublished.concat(id);
+    save(); renderAll(); return;
+  }
+  if(el.closest("#addProduct")){ addProductDialog(); return; }
+  if(el.closest("#resetFilters")){ S.filters = defaultState().filters; S.q = ""; save(); renderAll(); return; }
+  if(el.closest("#resetDemo")){
+    const lang = S.lang; S = defaultState(); S.lang = lang; seedDemo(); S.seeded = true; save();
+    location.hash = "#/"; renderAll(); return;
+  }
+});
+document.addEventListener("change", (e) => {
+  const f = e.target.closest("[data-f]");
+  if(f){
+    const key = f.getAttribute("data-f");
+    S.filters[key] = f.type === "checkbox" ? f.checked : f.value;
+    save(); renderView(); return;
+  }
+  if(e.target.id === "city"){ S.city = e.target.value; save(); renderAll(); return; }
+});
+document.addEventListener("input", (e) => {
+  if(e.target.id === "fsPrice" || e.target.id === "fsCat"){
+    const price = Math.max(0, Number(document.getElementById("fsPrice").value) || 0);
+    const cat = document.getElementById("fsCat").value;
+    const sp = splitOf(price, 0, cat);
+    const classic = Math.round(price * 0.70);
+    document.getElementById("fsOut").innerHTML = barChart([
+      {label:t("fs_here"), v:sp.sellerGets, text:money(sp.sellerGets), hl:true},
+      {label:t("fs_classic"), v:classic, text:money(classic)}
+    ], {note:t("fs_classic_note")});
+  }
+});
+document.addEventListener("submit", (e) => {
+  if(e.target.id === "searchForm"){
+    e.preventDefault();
+    S.q = document.getElementById("q").value.trim();
+    save();
+    if(currentRoute() !== "#/catalog") location.hash = "#/catalog"; else renderAll();
+    return;
+  }
+  if(e.target.id === "checkoutForm"){
+    e.preventDefault();
+    const form = {
+      name:document.getElementById("ckName").value.trim(),
+      phone:document.getElementById("ckPhone").value.trim(),
+      city:document.getElementById("ckCity").value,
+      addr:document.getElementById("ckAddr").value.trim(),
+      pay:(document.querySelector('input[name="pay"]:checked') || {}).value || "card",
+      settle:(document.querySelector('input[name="settle"]:checked') || {}).value || "hold"
+    };
+    S.city = form.city; save();
+    createOrder(form);
+  }
+});
+document.querySelectorAll(".langs button").forEach(b => b.addEventListener("click", () => {
+  S.lang = b.dataset.lang; save(); renderAll();
+}));
+window.addEventListener("hashchange", () => { renderAll(); window.scrollTo({top:0, behavior:"instant"}); });
+
+/* boot */
+load();
+renderAll();
+</script>
