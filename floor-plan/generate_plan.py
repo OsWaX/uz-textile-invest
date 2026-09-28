@@ -9,10 +9,12 @@ millimetres) and writes:
   plan_1-50.png  — raster preview of the sheet
   plan.dxf       — CAD file, model space in real mm (plot 1:50 on A2)
 
-Wall thickness is 320 mm for every wall.  All clear room dimensions of
-the source sales plan are kept exactly; everything the source does not
-dimension (doors, windows, piers, shaft, niche, chamfers) was measured
-from the source image (~14.2 mm per pixel) and rounded.
+Wall thickness is 320 mm for every wall; the right and the bottom
+facades are continuous panoramic glazing over their full length.  All
+clear room dimensions of the source sales plan are kept exactly;
+everything the source does not dimension (doors, windows, shafts, niche,
+chamfers) was measured from the source image (~14.2 mm per pixel) and
+rounded.  Every size is dimensioned once (no duplicated dimensions).
 
 Model coordinates: origin = top-left outer corner of the apartment,
 X to the right, Y downwards (as on the sheet).
@@ -62,9 +64,9 @@ BR2_DOOR_JAMB = 150             # jambs of bedroom-2 door
 BR1_DOOR_JAMB = 290             # left jamb of bedroom-1 door
 DOOR = 900                      # interior door opening
 LOG_WALL = 1220                 # solid part of the loggia partition
-LOG_GLASS = 950                 # fixed glazing of the loggia partition
+LOG_GLASS = 630                 # fixed glazing of the loggia partition
 LOG_DOOR = 800                  # loggia door
-BOT_PIER = (6460, 7600)         # pier of the bottom facade (X)
+KSHAFT = (700, 550)             # kitchen ventilation shaft, outer X x Y
 LEFT_WIN_END = 14450            # end of the side window of bedroom 1 (Y)
 
 # ---------------------------------------------------------------------------
@@ -92,10 +94,11 @@ X_NICHE_I = X_F - NICHE_W               # 10000
 X_NICHE_O = X_NICHE_I - THIN            # 9880
 X_NICHE_DOOR = X_NICHE_I + 500          # 10500
 X_COL_L = (X_CW_O, X_CW_O + COL)        # left column line
-X_COL_R = (X_OUT - COL, X_OUT)          # right column line
+X_COL_R = (X_F - COL, X_F)              # right column line (inside)
 X_BR1_DOOR = (X_COR_L + BR1_DOOR_JAMB, X_COR_L + BR1_DOOR_JAMB + DOOR)
 X_LOG_G = X_BR2_L + LOG_WALL            # 8680
-X_LOG_D = X_LOG_G + LOG_GLASS           # 9630
+X_LOG_D = X_LOG_G + LOG_GLASS           # 9310
+X_KSH_R = X_KIT_L + KSHAFT[0]           # 7110  kitchen shaft
 assert X_LOG_D + LOG_DOOR == X_COL_R[0]
 
 Y_OUT_T = 0
@@ -119,6 +122,7 @@ Y_SHAFT_T = Y_WC_B - SHAFT_H            # 4040
 Y_NICHE_O = Y_LIV_B - NICHE_OVER        # 3040
 Y_NICHE_I = Y_NICHE_O + THIN            # 3160
 Y_NICHE_JAMB = 4150
+Y_KSH_B = Y_KIT_T + KSHAFT[1]           # 4190  kitchen shaft
 Y_COL_T = (0, COL)                      # top column row
 Y_COL_M = (Y_BR2_T - COL, Y_BR2_T)      # middle row (6360..6860)
 Y_COL_B = (Y_LOG_T - COL, Y_LOG_T)      # bottom row (12530..13030)
@@ -158,18 +162,18 @@ wall_parts = [
              (X_COR_R, KIT_DOOR[0]), LIV_DIAG_B, LIV_DIAG_A]),
     box(X_COR_R, KIT_DOOR[1], X_KIT_L, Y_BR2_DOOR[0]),        # corridor right
     box(X_COR_R, Y_BR2_DOOR[1], X_KIT_L, Y_BR1_T),
-    box(X_COR_R, Y_KIT_B, X_OUT, Y_BR2_T),                    # kitchen bottom
+    box(X_COR_R, Y_KIT_B, X_F, Y_BR2_T),                      # kitchen bottom
     box(X_CW_O, Y_BR1W_T, X_BR2_L, Y_BR1_T),                  # bedroom-1 top
-    box(X_BR1_R, Y_BR1W_T, X_BR2_L, Y_OUT),                   # partition
+    box(X_BR1_R, Y_BR1W_T, X_BR2_L, Y_BOT),                   # partition
     box(X_BR2_L, Y_BR2_B, X_LOG_G, Y_LOG_T),                  # loggia wall
-    box(X_F, 0, X_OUT, Y_OUT),                                # right facade
-    box(X_CW_O, Y_BOT, X_OUT, Y_OUT),                         # bottom facade
     # shaft and niche enclosures (thin)
     box(X_WCW_O, Y_SHAFT_T, X_SHAFT_R, Y_WC_B).difference(
         box(X_WCW_O + THIN, Y_SHAFT_T + THIN, X_SHAFT_R - THIN, Y_WC_B)),
     box(X_NICHE_O, Y_NICHE_O, X_NICHE_I, NICHE_BOTTOM),
     box(X_NICHE_O, Y_NICHE_O, X_F, Y_NICHE_I),
     box(X_NICHE_DOOR, Y_NICHE_JAMB, X_F, NICHE_BOTTOM),
+    box(X_KIT_L, Y_KIT_T, X_KSH_R, Y_KSH_B).difference(       # kitchen shaft
+        box(X_KIT_L, Y_KIT_T, X_KSH_R - THIN, Y_KSH_B - THIN)),
 ]
 
 columns = [
@@ -183,15 +187,15 @@ columns = [
 
 # Windows: (axis, fixed-range, span)  axis 'v' = in a vertical wall
 windows = [
-    ('v', (X_F, X_OUT), (Y_COL_T[1], Y_NICHE_O)),              # living
-    ('v', (X_F, X_OUT), (NICHE_BOTTOM, Y_COL_M[0])),           # kitchen
-    ('v', (X_F, X_OUT), (Y_COL_M[1], Y_COL_B[0])),             # bedroom 2
-    ('v', (X_F, X_OUT), (Y_COL_B[1], Y_BOT)),                  # loggia
     ('v', (X_CW_O, X_COR_L), (Y_COL_B[1], LEFT_WIN_END)),      # bedroom 1 side
-    ('h', (Y_BOT, Y_OUT), (X_COL_L[1], BOT_PIER[0])),          # bedroom 1
-    ('h', (Y_BOT, Y_OUT), (BOT_PIER[1], X_F)),                 # loggia
     ('h', (Y_BR2_B, Y_LOG_T), (X_LOG_G, X_LOG_D)),             # loggia glazing
 ]
+# Right and bottom facades: continuous panoramic glazing (витраж), 320 mm
+# zone, from the top wall round the corner to the left wall.
+PANO_OUT = [(X_OUT, Y_TOP_IN), (X_OUT, Y_OUT), (X_COR_L, Y_OUT)]
+PANO_IN = [(X_F, Y_TOP_IN), (X_F, Y_BOT), (X_COR_L, Y_BOT)]
+PANO_GLASS = [[(X_F + d, Y_TOP_IN), (X_F + d, Y_BOT + d), (X_COR_L, Y_BOT + d)]
+              for d in (T / 2 - 30, T / 2 + 30)]
 
 door_cuts = [
     box(0, ENTRY[0], X_HALL_IN, ENTRY[1]),
@@ -238,7 +242,10 @@ ROOMS = [
     (8, 'Лоджия', 'Loggia',
      box(X_BR2_L, Y_LOG_T, X_F, Y_BOT)),
 ]
-ROOM_AREAS = {n: round(poly.difference(WALLS).area / 1e6, 2)
+SHAFTS = unary_union([box(X_WCW_O, Y_SHAFT_T, X_SHAFT_R, Y_WC_B),
+                      box(X_KIT_L, Y_KIT_T, X_KSH_R, Y_KSH_B)])
+ROOM_AREAS = {n: round(poly.difference(WALLS).difference(SHAFTS).area / 1e6,
+                       2)
               for n, _, _, poly in ROOMS}
 NICHE_AREA = round(box(X_NICHE_I, Y_NICHE_I, X_F, NICHE_BOTTOM)
                    .difference(WALLS).area / 1e6, 2)
@@ -331,6 +338,9 @@ S.geom(COLUMNS, 'A-COLS', fill='#1a1a1a', lw=0.5)
 sv = (X_WCW_O + THIN, Y_SHAFT_T + THIN, X_SHAFT_R - THIN, Y_WC_B)
 S.line((sv[0], sv[1]), (sv[2], sv[3]), 'A-WALL', 0.18)
 S.line((sv[2], sv[1]), (sv[0], sv[3]), 'A-WALL', 0.18)
+kv = (X_KIT_L, Y_KIT_T, X_KSH_R - THIN, Y_KSH_B - THIN)
+S.line((kv[0], kv[1]), (kv[2], kv[3]), 'A-WALL', 0.18)
+S.line((kv[2], kv[1]), (kv[0], kv[3]), 'A-WALL', 0.18)
 
 
 # --- windows ---------------------------------------------------------------
@@ -346,6 +356,10 @@ def draw_window(w):
 
 for w in windows:
     draw_window(w)
+S.pline(PANO_OUT, 'A-GLAZ', 0.25)
+S.pline(PANO_IN, 'A-GLAZ', 0.25)
+for g in PANO_GLASS:
+    S.pline(g, 'A-GLAZ', 0.18)
 
 
 # --- doors -----------------------------------------------------------------
@@ -474,7 +488,7 @@ S.pline([(3230, Y_WC_B - 60), (3230, Y_WC_B - 330), (3470, Y_WC_B - 400),
          (3710, Y_WC_B - 330), (3710, Y_WC_B - 60)], 'A-EQPM', 0.13, EQ)
 
 # kitchen: worktop 600 deep, sink, hob, fridge, table
-rect(X_KIT_L, Y_KIT_T, X_NICHE_O, Y_KIT_T + 600, 'A-EQPM', EQ, 0.18)
+rect(X_KSH_R, Y_KIT_T, X_NICHE_O, Y_KIT_T + 600, 'A-EQPM', EQ, 0.18)
 rect(7700, Y_KIT_T + 80, 8250, Y_KIT_T + 520, 'A-EQPM', EQ)
 S.circle((7975, Y_KIT_T + 300), 40, 'A-EQPM', 0.13, EQ)
 rect(8750, Y_KIT_T + 40, 9330, Y_KIT_T + 560, 'A-EQPM', EQ)
@@ -482,10 +496,10 @@ for cx, cy, r in ((8900, 3830, 90), (9180, 3830, 110), (8900, 4150, 110),
                   (9180, 4150, 90)):
     S.circle((cx, cy), r, 'A-EQPM', 0.13, EQ)
 rect(X_KIT_L, Y_KIT_B - 600, X_KIT_L + 700, Y_KIT_B, 'A-EQPM', EQ, 0.18)
-S.line((X_KIT_L, Y_KIT_B - 600), (X_KIT_L + 700, Y_KIT_B), 'A-EQPM', 0.09,
-       EQ)
-S.line((X_KIT_L + 700, Y_KIT_B - 600), (X_KIT_L, Y_KIT_B), 'A-EQPM', 0.09,
-       EQ)
+fx, fy = X_KIT_L + 350, Y_KIT_B - 300          # fridge: asterisk mark
+for ang in (0, 60, 120):
+    dx, dy = 110 * math.cos(math.radians(ang)), 110 * math.sin(math.radians(ang))
+    S.line((fx - dx, fy - dy), (fx + dx, fy + dy), 'A-EQPM', 0.13, EQ)
 rect(7980, 5840, 9380, Y_KIT_B)
 chair(8330, 5560, back='n')
 chair(9030, 5560, back='n')
@@ -513,12 +527,12 @@ rect(X_BR2_L, 9410, X_BR2_L + 450, 9860)
 rect(X_BR2_L, 11760, X_BR2_L + 450, 12210)
 # loggia desk
 rect(X_BR2_L, 13130, 8110, 14530)
-chair(8450, 13830, 500, 500, 'e')
+chair(8400, 13830, 500, 500, 'e')
 
 # --- room labels -----------------------------------------------------------
 LABEL_POS = {
     1: (2150, 1180), 2: (4980, 5000), 3: (2900, 4160), 4: (8125, 1760),
-    5: (8300, 4950), 6: (5700, 9500), 7: (8900, 8450), 8: (9250, 14000),
+    5: (8300, 4950), 6: (5700, 9500), 7: (8900, 8450), 8: (9150, 14100),
 }
 for n, ru, en, poly in ROOMS:
     x, y = LABEL_POS[n]
@@ -533,70 +547,60 @@ S.text((10305, 3700), 'Тех.', 2.5)
 S.text((10305, 3850), 'ниша', 2.5)
 S.text((1977, 4520), 'Вент-', 2.0, rot=90)
 S.text((2087, 4520), 'шахта', 2.0, rot=90)
+kx, ky = (kv[0] + kv[2]) / 2, (kv[1] + kv[3]) / 2
+S.pline([(kx - 260, ky - 130), (kx + 260, ky - 130), (kx + 260, ky + 120),
+         (kx - 260, ky + 120)], 'A-MASK', 0.01, '#ffffff', closed=True,
+        fill='#ffffff')
+S.text((kx, ky - 20), 'Вентшахта', 1.8)
+S.text((kx, ky + 100), f'{KSHAFT[0]}×{KSHAFT[1]}', 1.8)
 
 # --- dimensions ------------------------------------------------------------
-D1, D2, D3 = 700, 1100, 1500            # offsets of the outer chains
+# Every size is dimensioned exactly once: rooms on the perimeter on the
+# outer chains, inner rooms, openings and details inside the plan.
+D1, D2 = 700, 1100                      # offsets of the outer chains
 
-# top
-S.chain('h', -D1, [(0, 0), (X_COL_L[0], 0), (X_COL_L[1], 0),
-                   (X_COL_R[0], 0), (X_OUT, 0)])
-S.chain('h', -D2, [(0, 0), (X_HALL_IN, 0), (X_HALL_R, 0), (X_LW_O, 0),
+# top: walls and rooms; overall width
+S.chain('h', -D1, [(0, 0), (X_HALL_IN, 0), (X_HALL_R, 0), (X_LW_O, 0),
                    (X_LIV_L, 0), (X_F, 0), (X_OUT, 0)], src={1, 4})
-S.dim('h', 0, X_OUT, -D3, (0, 0))
+S.dim('h', 0, X_OUT, -D2, (0, 0))
 
-# right
-yr = [0, Y_COL_T[1], Y_NICHE_O, NICHE_BOTTOM, Y_COL_M[0], Y_COL_M[1],
-      Y_COL_B[0], Y_COL_B[1], Y_BOT, Y_OUT]
-S.chain('v', X_OUT + D1, [(y, X_OUT) for y in yr])
-yr2 = [0, Y_TOP_IN, Y_LIV_B, Y_KIT_T, Y_KIT_B, Y_BR2_T, Y_BR2_B, Y_LOG_T,
-       Y_BOT, Y_OUT]
-S.chain('v', X_OUT + D2, [(y, X_OUT) for y in yr2], src={1, 3, 5, 7})
-S.dim('v', 0, Y_OUT, X_OUT + D3, (X_OUT, X_OUT))
+# right: walls and rooms; overall height
+yr = [0, Y_TOP_IN, Y_LIV_B, Y_KIT_T, Y_KIT_B, Y_BR2_T, Y_BR2_B, Y_LOG_T,
+      Y_BOT, Y_OUT]
+S.chain('v', X_OUT + D1, [(y, X_OUT) for y in yr], src={1, 3, 5, 7})
+S.dim('v', 0, Y_OUT, X_OUT + D2, (X_OUT, X_OUT))
 
-# bottom
-xb = [X_CW_O, X_COL_L[1], BOT_PIER[0], BOT_PIER[1], X_F, X_OUT]
-S.chain('h', Y_OUT + D1, [(x, Y_OUT) for x in xb])
-xb2 = [X_CW_O, X_COR_L, X_BR1_R, X_BR2_L, X_F, X_OUT]
-S.chain('h', Y_OUT + D2, [(x, Y_OUT) for x in xb2], src={1, 3})
-S.dim('h', X_CW_O, X_OUT, Y_OUT + D3, (Y_OUT, Y_OUT))
+# bottom: walls and rooms (glazing depth is on the top chain); overall
+xb = [X_CW_O, X_COR_L, X_BR1_R, X_BR2_L, X_F]
+S.chain('h', Y_OUT + D1, [(x, Y_OUT) for x in xb], src={1, 3})
+S.dim('h', X_CW_O, X_OUT, Y_OUT + D2, (Y_OUT, Y_OUT))
 
-# left — hall part
-XL1, XL2, XL3 = -1300, -1700, -2100
-S.chain('v', XL1, [(0, 0), (ENTRY[0], 0), (ENTRY[1], 0), (Y_WC_T, 0)])
-S.chain('v', XL2, [(0, 0), (Y_TOP_IN, 0), (Y_HALL_B, 0), (Y_WC_T, 0)],
-        src={1})
-S.dim('v', 0, Y_OUT, XL3, (0, X_CW_O))
-# left — WC wall part
-S.chain('v', X_WCW_O - 700, [(Y_WC_T, X_WCW_O), (Y_SHAFT_T, X_WCW_O),
-                             (Y_WC_B, X_WCW_O), (Y_WCW_B, X_WCW_O)])
-S.chain('v', X_WCW_O - 1100, [(Y_HALL_B, 0), (Y_WC_T, X_WCW_O),
-                              (Y_WC_B, X_WCW_O), (Y_WCW_B, X_WCW_O)],
-        src={1})
+# left — hall wall: entrance door, hall bottom wall
+S.chain('v', -1300, [(0, 0), (ENTRY[0], 0), (ENTRY[1], 0), (Y_HALL_B, 0),
+                     (Y_WC_T, 0)])
+# left — WC wall: WC depth, bottom wall, shaft
+S.chain('v', X_WCW_O - 700, [(Y_WC_T, X_WCW_O), (Y_WC_B, X_WCW_O),
+                             (Y_WCW_B, X_WCW_O)], src={0})
+S.dim('v', Y_SHAFT_T, Y_WC_B, X_WCW_O - 350, (X_WCW_O, X_WCW_O))
 S.dim('h', 0, X_WCW_O, Y_WCW_B + 500, (Y_WC_T, Y_WCW_B))
-# left — corridor / bedroom-1 wall part
+# left — corridor / bedroom-1 wall: columns and side window; rooms
 S.chain('v', X_CW_O - 700, [(Y_WCW_B, X_CW_O), (Y_COL_M[0], X_CW_O),
                             (Y_COL_M[1], X_CW_O), (Y_COL_B[0], X_CW_O),
                             (Y_COL_B[1], X_CW_O), (LEFT_WIN_END, X_CW_O),
                             (Y_OUT, X_CW_O)])
 S.chain('v', X_CW_O - 1100, [(Y_WCW_B, X_CW_O), (Y_BR1W_T, X_CW_O),
-                             (Y_BR1_T, X_CW_O), (Y_BOT, X_CW_O),
-                             (Y_OUT, X_CW_O)], src={2})
+                             (Y_BR1_T, X_CW_O), (Y_BOT, X_CW_O)], src={2})
 
 # --- interior dimensions ---------------------------------------------------
-# hall
-S.dim('h', X_HALL_IN, X_HALL_R, 560, src=True)
+# hall depth (width is on the top chain)
 S.dim('v', Y_TOP_IN, Y_HALL_B, 3700, src=True)
-# living room
-S.dim('h', X_LIV_L, X_F, 560, src=True)
-S.dim('v', Y_TOP_IN, Y_NICHE_O, 10350, shift=0)
-S.dim('v', Y_TOP_IN, Y_LIV_B, 10150, src=True)
+# living room: position of the niche
+S.dim('v', Y_TOP_IN, Y_NICHE_O, 10050, shift=18)
 # corridor / kitchen row
-S.chain('h', 5700, [(X_CW_O, None), (X_COR_L, None), (X_COR_R, None),
-                    (X_KIT_L, None), (X_F, None)], src={1, 3})
-S.dim('v', Y_KIT_T, Y_KIT_B, 7550, src=True)
-# corridor: top width, length, doors in the corridor-right wall
+S.chain('h', 5700, [(X_COR_L, None), (X_COR_R, None), (X_KIT_L, None),
+                    (X_F, None)], src={0, 2})
+# corridor: top width, living-room door, 45° wall, length, doors
 S.dim('h', X_COR_L, X_LW_O, 2900)
-S.dim('h', X_COL_L[1], X_LW_O, 800)
 S.chain('v', 4550, [(Y_TOP_IN, X_LW_O), (LIV_DOOR[0], X_LW_O),
                     (LIV_DOOR[1], X_LW_O), (LIV_DIAG_A[1], X_LW_O)])
 S.text((5520, 3480), '45°', 2.5)
@@ -609,28 +613,21 @@ S.chain('v', 5850, [(Y_COR_DIAG, None), (KIT_DOOR[0], None),
         tweaks={4: (-4.4, -1.5)})
 S.chain('h', 7750, [(X_COR_L, None), (X_BR1_DOOR[0], None),
                     (X_BR1_DOOR[1], None), (X_COR_R, None)])
-# WC
+# WC: width, width at the shaft, start of the 45° corner, door, shaft
 S.dim('h', X_WC_L, X_WC_R, 3900, shift=-8)
 S.dim('h', X_SHAFT_R, X_WC_R, 4560, src=True)
-S.chain('h', 2800, [(X_WC_L, None), (WC_DIAG_A[0], None), (X_WC_R, None)])
+S.dim('h', X_WC_L, WC_DIAG_A[0], 2800)
 S.chain('v', 4600, [(WC_DIAG_COR[1], X_COR_L), (WC_DOOR[0], X_COR_L),
                     (WC_DOOR[1], X_COR_L)])
 S.dim('h', X_WCW_O, X_SHAFT_R, Y_SHAFT_T - 250, (Y_SHAFT_T, Y_SHAFT_T))
-# kitchen niche
+# technical niche
 S.dim('h', X_NICHE_I, X_F, Y_NICHE_I + 200)
 S.dim('v', Y_NICHE_I, NICHE_BOTTOM, 9700, (X_NICHE_O, X_NICHE_O))
 S.dim('h', X_NICHE_I, X_NICHE_DOOR, NICHE_BOTTOM + 650)
-# bedroom 1
-S.dim('h', X_COR_L, X_BR1_R, 9150, src=True)
-S.dim('v', Y_BR1_T, Y_BOT, 4700, src=True)
-# bedroom 2
-S.dim('h', X_BR2_L, X_F, 12300, src=True)
-S.dim('v', Y_BR2_T, Y_BR2_B, 10150, src=True)
+# bedroom 2 entrance part
 S.dim('h', X_KIT_L, X_BR2_L, 7050)
 S.dim('v', Y_BR2_T, Y_BR1W_T, 7380)
-# loggia
-S.dim('v', Y_LOG_T, Y_BOT, 10150, src=True)
-S.dim('h', X_BR2_L, X_F, 14500, src=True)
+# loggia partition: wall, glazing, door
 S.chain('h', Y_LOG_T + 350, [(X_BR2_L, None), (X_LOG_G, None),
                              (X_LOG_D, None), (X_COL_R[0], None)])
 
@@ -638,7 +635,7 @@ S.chain('h', Y_LOG_T + 350, [(X_BR2_L, None), (X_LOG_G, None),
 # 6. Sheet (A2 landscape): frame, title, explication, notes, stamp
 # ---------------------------------------------------------------------------
 PAPER_W, PAPER_H = 594.0, 420.0
-OX, OY = 76.0, 66.0                     # paper position of model origin
+OX, OY = 76.0, 70.0                     # paper position of model origin
 
 
 def to_model(px, py):
@@ -666,10 +663,11 @@ def sheet_text(x, y, s, h, anchor='start', bold=False):
 sheet_rect(20, 5, PAPER_W - 5, PAPER_H - 5, 0.7)
 
 # plan title
-sheet_text(76 + X_OUT / 2 / SCALE, 20, 'ПЛАН КВАРТИРЫ   М 1:50', 7,
+sheet_text(OX + X_OUT / 2 / SCALE, 20, 'ПЛАН КВАРТИРЫ   М 1:50', 7,
            anchor='middle', bold=True)
-sheet_text(76 + X_OUT / 2 / SCALE, 27,
-           'толщина стен 320 мм, размеры в мм', 3.5, anchor='middle')
+sheet_text(OX + X_OUT / 2 / SCALE, 27,
+           'стены 320 мм, справа и снизу — панорамное остекление; размеры в мм',
+           3.5, anchor='middle')
 
 # explication of rooms
 EX, EY = 352.0, 20.0
@@ -710,17 +708,21 @@ sheet_text(EX, NY, 'ПРИМЕЧАНИЯ', 5, bold=True)
 notes = [
     '1. Все размеры в миллиметрах, площади в м². Масштаб 1:50 —',
     '    печатать на листе А2 в масштабе 100 % (без подгонки).',
-    '2. Толщина всех стен 320 мм. Стенки вентшахты и тех. ниши 120 мм.',
-    '3. Жирным шрифтом — размеры помещений в чистоте по исходному',
+    '2. Толщина всех стен 320 мм. Стенки вентшахт и тех. ниши 120 мм.',
+    '3. Правая и нижняя наружные стороны — сплошное панорамное',
+    '    остекление (витраж) на всю длину, зона 320 мм.',
+    '4. Жирным шрифтом — размеры помещений в чистоте по исходному',
     '    плану (сохранены без изменений). Остальные размеры получены',
     '    расчётом или обмером исходного плана с округлением.',
-    '4. Сечение колонн 500×500 принято условно (в исходном плане',
-    '    не указано); колонны заподлицо с наружной гранью стен.',
-    '5. Площади подсчитаны по чертежу (в чистоте, за вычетом колонн,',
-    '    без площади проёмов). Площадь тех. ниши '
+    '    Каждый размер указан один раз.',
+    '5. Колонны 500×500 приняты условно (в исходном плане не указаны):',
+    '    у стен — заподлицо с наружной гранью, у витража — внутри',
+    '    помещений, вплотную к остеклению.',
+    '6. Площади подсчитаны по чертежу (в чистоте, за вычетом колонн',
+    '    и вентшахт, без площади проёмов). Площадь тех. ниши '
     f'{NICHE_AREA:.2f}'.replace('.', ',') + ' м² не учтена.',
-    '6. Мебель показана условно, по исходному плану.',
-    '7. Контроль масштаба: отрезок 0–5 м на шкале = 100 мм.',
+    '7. Мебель показана условно, по исходному плану.',
+    '8. Контроль масштаба: отрезок 0–5 м на шкале = 100 мм.',
 ]
 for i, s in enumerate(notes):
     sheet_text(EX, NY + 8 + i * 5.2, s, 3.0)
@@ -740,7 +742,8 @@ sheet_text(BX + 104, BY + 3, 'м  (М 1:50)', 3.0)
 LY = BY + 20
 sheet_text(EX, LY, 'УСЛОВНЫЕ ОБОЗНАЧЕНИЯ', 5, bold=True)
 lg = [('wall', 'Стена 320 мм'), ('col', 'Колонна 500×500'),
-      ('win', 'Окно / витраж'), ('src', 'Размер по исходному плану')]
+      ('win', 'Окно, панорамное остекление (витраж)'),
+      ('shaft', 'Вентшахта'), ('src', 'Размер по исходному плану')]
 for i, (k, s) in enumerate(lg):
     y = LY + 6 + i * 8
     if k == 'wall':
@@ -753,6 +756,11 @@ for i, (k, s) in enumerate(lg):
     elif k == 'win':
         for dy, lw in ((0, 0.25), (1.4, 0.18), (2.6, 0.18), (4, 0.25)):
             sheet_line(EX, y + dy, EX + 16, y + dy, lw)
+    elif k == 'shaft':
+        S.pline([P(EX + 4, y - 1), P(EX + 12, y - 1), P(EX + 12, y + 5),
+                 P(EX + 4, y + 5)], 'A-SHEET', 0.5, closed=True)
+        sheet_line(EX + 4, y - 1, EX + 12, y + 5, 0.18)
+        sheet_line(EX + 12, y - 1, EX + 4, y + 5, 0.18)
     else:
         sheet_text(EX + 8, y + 4, '4350', 3.0, anchor='middle', bold=True)
     sheet_text(EX + 22, y + 3.5, s, 3.5)
@@ -1016,6 +1024,8 @@ def write_dxf(path):
             msp.add_line(fp(p), fp(q), dxfattribs=lw_attr(layer, lw))
         elif k == 'pline':
             _, pts, layer, lw, stroke, closed, fill, dash = it
+            if layer == 'A-MASK':
+                continue
             msp.add_lwpolyline([fp(p) for p in pts], close=closed,
                                dxfattribs=lw_attr(layer, lw))
         elif k == 'arc':

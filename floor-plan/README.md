@@ -12,8 +12,11 @@ Check the print scale with the scale bar on the sheet: 0–5 m must measure 100 
 
 ## Basis
 
-* **Wall thickness is 320 mm** for every wall. The ventilation-shaft and
-  technical-niche enclosures are 120 mm.
+* **Wall thickness is 320 mm** for every wall. The enclosures of the two
+  ventilation shafts (WC and kitchen) and of the technical niche are 120 mm.
+* **The right and bottom sides are fully panoramic glazing** (витраж):
+  one continuous 320 mm glazing zone running from the top wall, round
+  the corner, to the left wall. There are no solid piers.
 * Every clear room size from the source plan is kept exactly. These are
   drawn **bold** on the sheet:
   hall 3600 × 2000, living room 4970 × 3000, kitchen 4200 × 2900,
@@ -26,25 +29,31 @@ Check the print scale with the scale bar on the sheet: 0–5 m must measure 100 
   the niche or the 45° corners. These were measured from the source image
   (about 14.2 mm per pixel) and rounded.
 * The source does not give column sizes. The drawing assumes 500 × 500
-  columns, flush with the outer face of the walls.
+  columns. Along walls they are flush with the outer face of the wall.
+  Along the glazing they stand inside the rooms, against the glass, as on
+  the source plan.
+* Every size is dimensioned exactly once. Perimeter rooms are dimensioned
+  on the outer chains; inner rooms, openings and details inside the plan.
+  The kitchen shaft is labelled with its size (700 × 550).
 
 ## Areas (calculated from the drawing)
 
-Areas are clear floor areas. Columns are subtracted, and door openings are not counted.
+Areas are clear floor areas. Columns and shafts are subtracted, and door
+openings are not counted.
 
 | № | Room | m² |
 |---|---|---|
 | 1 | Прихожая / Entrance hall | 7.20 |
 | 2 | Коридор / Corridor | 13.00 |
 | 3 | С/У / WC | 4.05 |
-| 4 | Гостиная / Living room | 14.54 |
-| 5 | Кухня / Kitchen | 11.37 |
+| 4 | Гостиная / Living room | 14.48 |
+| 5 | Кухня / Kitchen | 10.93 |
 | 6 | Спальня / Bedroom 1 | 18.18 |
-| 7 | Спальня / Bedroom 2 | 19.66 |
+| 7 | Спальня / Bedroom 2 | 19.60 |
 | 8 | Лоджия / Loggia | 5.20 |
-| | Living area (4, 6, 7) | 52.38 |
-| | Total area (1–7) | 88.00 |
-| | Total incl. loggia (1–8) | 93.20 |
+| | Living area (4, 6, 7) | 52.26 |
+| | Total area (1–7) | 87.44 |
+| | Total incl. loggia (1–8) | 92.64 |
 
 ## Regenerate
 
