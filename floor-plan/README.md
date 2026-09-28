@@ -25,7 +25,7 @@ Check the print scale with the scale bar on the sheet: 0–5 m must measure 100 
 * The source dimensions are consistent with each other:
   1850 + 320 + 4200 = 2900 + 320 + 3150 = 6370.
   With 320 mm walls the apartment measures **10 930 × 15 000 mm** overall.
-* The source plan does not dimension doors, windows, piers, the shaft,
+* The source plan does not dimension doors, windows, the shafts,
   the niche or the 45° corners. These were measured from the source image
   (about 14.2 mm per pixel) and rounded.
 * The source does not give column sizes. The drawing assumes 500 × 500
