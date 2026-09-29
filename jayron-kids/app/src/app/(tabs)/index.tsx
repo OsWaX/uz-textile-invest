@@ -8,6 +8,7 @@ import { artBackground, GarmentArt } from '@/components/GarmentArt';
 import { LanguageSwitch } from '@/components/LanguageSwitch';
 import { ProductCard } from '@/components/product';
 import { Button, SectionHeader, T } from '@/components/ui';
+import { DEMO_MODE } from '@/lib/api';
 import { useStore } from '@/lib/store';
 import type { Category, Product } from '@/lib/types';
 import { useApi } from '@/lib/useApi';
@@ -51,6 +52,13 @@ export default function HomeScreen() {
           </View>
           <LanguageSwitch />
         </View>
+
+        {DEMO_MODE ? (
+          <View style={styles.demo}>
+            <Ionicons name="information-circle-outline" size={20} color={colors.ink} />
+            <T variant="small" color={colors.ink} style={{ flex: 1 }}>{t('demoBanner')}</T>
+          </View>
+        ) : null}
 
         <Pressable style={styles.search} onPress={() => openCatalog({ focus: '1' })} accessibilityRole="search">
           <Ionicons name="search" size={20} color={colors.inkSoft} />
@@ -153,6 +161,10 @@ const styles = StyleSheet.create({
   heroText: { flex: 1, gap: 6 },
   heroTagline: { fontFamily: fonts.headingSemi, fontSize: 13, color: colors.tealInk, letterSpacing: 0.5 },
   heroButton: { alignSelf: 'flex-start', marginTop: 6 },
+  demo: {
+    marginHorizontal: space.lg, paddingHorizontal: space.md, paddingVertical: space.sm, borderRadius: radius.md,
+    backgroundColor: colors.sunnySoft, flexDirection: 'row', alignItems: 'center', gap: space.sm,
+  },
   offline: {
     marginHorizontal: space.lg, padding: space.md, borderRadius: radius.md, backgroundColor: colors.coralSoft,
     flexDirection: 'row', alignItems: 'center', gap: space.sm,

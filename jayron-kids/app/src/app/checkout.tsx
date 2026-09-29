@@ -8,7 +8,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button, Card, Divider, Field, Row, T } from '@/components/ui';
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError, DEMO_MODE } from '@/lib/api';
 import { formatLocalPhone, fullPhone, localDigits } from '@/lib/format';
 import { useStore } from '@/lib/store';
 import type { DeliveryMethod, Order, PaymentMethod, Region } from '@/lib/types';
@@ -184,7 +184,7 @@ export default function CheckoutScreen() {
             ))}
           </View>
           {config?.demoPayments && payment !== 'cash' ? (
-            <View style={styles.demo}><T variant="small" color={colors.ink}>{t('demoPayments')}</T></View>
+            <View style={styles.demo}><T variant="small" color={colors.ink}>{t(DEMO_MODE ? 'demoAutoPay' : 'demoPayments')}</T></View>
           ) : null}
         </Card>
 

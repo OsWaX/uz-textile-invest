@@ -1,12 +1,24 @@
-/** Диалог подтверждения: Alert на телефоне, window.confirm в браузере (там Alert без кнопок). */
-import { Alert, Platform } from 'react-native';
+/**
+ * Подтверждение действия («Отменить заказ?») в собственном окне приложения —
+ * одинаково на телефоне и в браузере. Окно рисует ConfirmHost в корневом макете.
+ */
+export type ConfirmRequest = { title: string; yes: string; no: string; resolve: (answer: boolean) => void };
+
+let show: ((request: ConfirmRequest) => void) | null = null;
+
+export function registerConfirmHost(handler: (request: ConfirmRequest) => void) {
+  show = handler;
+  return () => {
+    if (show === handler) show = null;
+  };
+}
 
 export function confirmAsync(title: string, yes: string, no: string): Promise<boolean> {
-  if (Platform.OS === 'web') return Promise.resolve(globalThis.confirm?.(title) ?? false);
   return new Promise((resolve) => {
-    Alert.alert(title, undefined, [
-      { text: no, style: 'cancel', onPress: () => resolve(false) },
-      { text: yes, style: 'destructive', onPress: () => resolve(true) },
-    ], { cancelable: true, onDismiss: () => resolve(false) });
+    if (!show) {
+      resolve(false);
+      return;
+    }
+    show({ title, yes, no, resolve });
   });
 }

@@ -2,9 +2,19 @@
  * Клиент API магазина. Адрес сервера берётся из EXPO_PUBLIC_API_URL; при разработке
  * без него используется компьютер, на котором запущен Metro, порт 4000 — так
  * телефон с Expo Go сразу видит локальный сервер.
+ *
+ * С EXPO_PUBLIC_DEMO=1 сервер не нужен: запросы обрабатывает демо-магазин внутри
+ * приложения (см. lib/demo) — так веб-версию можно показать по одной ссылке.
  */
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
+
+import { demoRequest } from './demo/server';
+import { ApiError } from './errors';
+
+export { ApiError };
+
+export const DEMO_MODE = process.env.EXPO_PUBLIC_DEMO === '1';
 
 function detectApiUrl(): string {
   const configured = process.env.EXPO_PUBLIC_API_URL;
@@ -16,19 +26,6 @@ function detectApiUrl(): string {
 }
 
 export const API_URL = detectApiUrl();
-
-export class ApiError extends Error {
-  code: string;
-  status: number;
-  details: Record<string, any> | undefined;
-
-  constructor(code: string, status: number, details?: Record<string, any>) {
-    super(code);
-    this.code = code;
-    this.status = status;
-    this.details = details;
-  }
-}
 
 let authToken: string | null = null;
 let onUnauthorized: (() => void) | null = null;
@@ -44,6 +41,15 @@ export function setUnauthorizedHandler(handler: (() => void) | null) {
 type Options = { body?: unknown; auth?: boolean; signal?: AbortSignal };
 
 export async function api<T>(method: string, path: string, { body, auth = false, signal }: Options = {}): Promise<T> {
+  if (DEMO_MODE) {
+    try {
+      return await demoRequest<T>(method, path, body, auth ? authToken : null);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401 && auth) onUnauthorized?.();
+      throw error;
+    }
+  }
+
   const headers: Record<string, string> = { Accept: 'application/json' };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (auth && authToken) headers.Authorization = `Bearer ${authToken}`;

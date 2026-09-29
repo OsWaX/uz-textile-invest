@@ -36,7 +36,9 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "demo:web": "EXPO_PUBLIC_DEMO=1 expo export --platform web --output-dir dist-demo",
+    "demo:snapshot": "node scripts/demo-snapshot.js"
   },
   "private": true,
   "description": "Мобильное приложение интернет-магазина детской одежды Jayron Kids (iOS, Android)"

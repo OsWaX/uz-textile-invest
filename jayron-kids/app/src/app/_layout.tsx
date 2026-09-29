@@ -9,6 +9,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { ConfirmHost } from '@/components/ConfirmHost';
 import { StoreProvider, useStore } from '@/lib/store';
 import { colors, headingFont } from '@/theme';
 
@@ -56,6 +57,7 @@ export default function RootLayout() {
       <StoreProvider>
         <StatusBar style="dark" />
         <Navigator />
+        <ConfirmHost />
       </StoreProvider>
     </SafeAreaProvider>
   );
