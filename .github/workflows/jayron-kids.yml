@@ -1,0 +1,78 @@
+name: Jayron Kids
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "jayron-kids/**"
+      - ".github/workflows/jayron-kids.yml"
+  pull_request:
+    paths:
+      - "jayron-kids/**"
+      - ".github/workflows/jayron-kids.yml"
+
+jobs:
+  api:
+    name: Сервер магазина — тесты и образ
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: jayron_kids_test
+          POSTGRES_USER: jayron
+          POSTGRES_PASSWORD: jayron
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U jayron -d jayron_kids_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://jayron:jayron@127.0.0.1:5432/jayron_kids_test
+    defaults:
+      run:
+        working-directory: jayron-kids/api
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Установка Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Установка зависимостей
+        run: npm ci
+
+      - name: Проверка синтаксиса панели управления
+        run: node --check public/admin/admin.js
+
+      - name: Тесты API, Payme и Click
+        run: npm test
+
+      - name: Проверка сборки образа
+        run: docker build -t jayron-kids-api:ci .
+
+  app:
+    name: Мобильное приложение — типы и сборка
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: jayron-kids/app
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Установка Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Установка зависимостей
+        run: npm ci
+
+      - name: Проверка типов TypeScript
+        run: npx tsc --noEmit
+
+      - name: Сборка JavaScript-бандла
+        run: npx expo export --platform web --output-dir /tmp/jayron-web

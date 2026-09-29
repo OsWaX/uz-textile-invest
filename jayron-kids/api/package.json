@@ -1,0 +1,22 @@
+{
+  "name": "jayron-kids-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Сервер интернет-магазина детской одежды Jayron Kids: каталог, заказы, оплата Payme и Click, панель управления",
+  "type": "commonjs",
+  "main": "src/index.js",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "seed": "node scripts/seed.js",
+    "reset": "node scripts/seed.js --reset",
+    "test": "node --test --test-concurrency=1 tests/*.test.js"
+  },
+  "dependencies": {
+    "pg": "8.13.1"
+  },
+  "license": "UNLICENSED"
+}

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jayron Kids — управление магазином</title>
+  <link rel="icon" href="emblem.png">
+  <link rel="stylesheet" href="admin.css">
+  <script src="admin.js" defer></script>
+</head>
+<body>
+  <div id="login" class="login" hidden>
+    <form id="login-form" class="login-card">
+      <img src="emblem.png" alt="" class="login-logo" width="96" height="96">
+      <h1>Jayron Kids</h1>
+      <p class="muted">Панель управления магазином</p>
+      <label class="field">Пароль
+        <input type="password" name="password" autocomplete="current-password" required>
+      </label>
+      <button class="btn primary wide" type="submit">Войти</button>
+      <p class="error" id="login-error" role="alert"></p>
+    </form>
+  </div>
+
+  <div id="app" hidden>
+    <header class="topbar">
+      <div class="brand"><img src="emblem.png" alt="" width="36" height="36"><span>Jayron Kids</span></div>
+      <nav class="tabs" id="tabs" aria-label="Разделы">
+        <button type="button" data-tab="orders" class="active">Заказы</button>
+        <button type="button" data-tab="products">Товары</button>
+        <button type="button" data-tab="promo">Промокоды</button>
+        <button type="button" data-tab="delivery">Доставка</button>
+      </nav>
+      <button type="button" class="btn ghost small" id="logout">Выйти</button>
+    </header>
+    <main class="page">
+      <section id="summary" class="summary" aria-label="Сводка"></section>
+      <section id="view"></section>
+    </main>
+  </div>
+
+  <dialog id="modal" aria-labelledby="modal-title">
+    <div id="modal-body"></div>
+  </dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

@@ -1,0 +1,41 @@
+# =============================================================================
+#  Jayron Kids — сервер магазина и база данных одной командой
+#    cp api/.env.example api/.env   # заполнить ADMIN_PASSWORD, ESKIZ_*, PAYME_*, CLICK_*
+#    docker compose up -d --build
+#    docker compose exec api node scripts/seed.js   # стартовый каталог (один раз)
+#  Панель управления: http://<сервер>:4000/admin/
+# =============================================================================
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: jayron_kids
+      POSTGRES_USER: jayron
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-jayron}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jayron -d jayron_kids"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: ./api
+    restart: unless-stopped
+    env_file: ./api/.env
+    environment:
+      DATABASE_URL: postgres://jayron:${DB_PASSWORD:-jayron}@db:5432/jayron_kids
+      TZ: Asia/Tashkent
+    ports:
+      - "4000:4000"
+    volumes:
+      - uploads:/app/data/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db_data:
+  uploads:

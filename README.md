@@ -404,3 +404,12 @@ Excel, журнал аудита со старыми и новыми значе�
 | [`docs/deployment.md`](docs/deployment.md) | Установка, резервное копирование, восстановление |
 | [`docs/data-model.md`](docs/data-model.md) | Модель данных и перенос на PostgreSQL |
 | [`docs/tz-compliance.md`](docs/tz-compliance.md) | Соответствие требованиям ТЗ по пунктам |
+
+---
+
+## Мобильное приложение Jayron Kids
+
+В папке [`jayron-kids/`](jayron-kids) — отдельный проект: мобильное приложение
+(iOS и Android) интернет-магазина детской одежды собственного бренда Jayron Kids,
+сервер магазина с оплатой через Payme и Click и панель управления.
+Описание, запуск и публикация — в [`jayron-kids/README.md`](jayron-kids/README.md).
